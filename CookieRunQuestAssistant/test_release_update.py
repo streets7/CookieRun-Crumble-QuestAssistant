@@ -18,6 +18,9 @@ class FakeResponse(io.BytesIO):
 
 
 class ReleaseUpdateTests(unittest.TestCase):
+    def test_default_repository_points_to_public_release_channel(self):
+        self.assertEqual(web_ui.GITHUB_REPOSITORY, "streets7/CookieRun-Crumble-QuestAssistant")
+
     def test_parse_version_ignores_prefix_and_missing_parts(self):
         self.assertEqual(release_update.parse_version("v15.18"), (15, 18))
         self.assertEqual(release_update.parse_version("16.0.1"), (16, 0, 1))

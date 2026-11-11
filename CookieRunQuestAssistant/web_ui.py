@@ -29,7 +29,9 @@ HOST = "127.0.0.1"
 PORT = int(os.environ.get("CQA_PORT", "8765"))
 APP_VERSION = "v16.0"
 STABLE_VERSION = "v16.0"
-GITHUB_REPOSITORY = os.environ.get("CQA_GITHUB_REPOSITORY", "").strip()
+GITHUB_REPOSITORY = os.environ.get(
+    "CQA_GITHUB_REPOSITORY", "streets7/CookieRun-Crumble-QuestAssistant"
+).strip()
 ADMIN_TOKENS = set()
 RESOURCE_DIR = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
 SOURCE_DIR = Path(__file__).resolve().parent
