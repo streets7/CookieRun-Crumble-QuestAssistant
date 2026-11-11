@@ -1,0 +1,80 @@
+name: Build desktop apps
+
+on:
+  workflow_dispatch:
+
+jobs:
+  desktop:
+    strategy:
+      matrix:
+        include:
+          - os: macos-14
+            artifact: CookieRun-Crumble-QuestAssistant-macOS
+          - os: windows-2022
+            artifact: CookieRun-Crumble-QuestAssistant-Windows11
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Windows installer compiler
+        if: runner.os == 'Windows'
+        run: choco install innosetup --no-progress -y
+      - name: Install Python dependencies
+        working-directory: CookieRunQuestAssistant
+        run: python -m pip install -r requirements-runtime.txt
+      - name: Create private build configuration
+        shell: bash
+        env:
+          CQA_ADMIN_PASSWORD: ${{ secrets.CQA_ADMIN_PASSWORD }}
+          CQA_SUPPORT_ACCOUNT: ${{ secrets.CQA_SUPPORT_ACCOUNT }}
+          CQA_SUPPORT_HOLDER: ${{ secrets.CQA_SUPPORT_HOLDER }}
+          CQA_CONTACT_EMAIL: ${{ secrets.CQA_CONTACT_EMAIL }}
+        run: |
+          python - <<'PY'
+          import json, os
+          values = {key.lower().removeprefix('cqa_'): os.environ.get(key, '') for key in ('CQA_ADMIN_PASSWORD','CQA_SUPPORT_ACCOUNT','CQA_SUPPORT_HOLDER','CQA_CONTACT_EMAIL')}
+          if not values['admin_password']:
+              raise SystemExit('CQA_ADMIN_PASSWORD secret is required')
+          with open('CookieRunQuestAssistant/private_config.json', 'w', encoding='utf-8') as f:
+              json.dump(values, f, ensure_ascii=False)
+          PY
+      - name: Check Python
+        working-directory: CookieRunQuestAssistant
+        run: python -m unittest discover -q
+      - name: Check user interface
+        working-directory: CookieRunQuestAssistant
+        run: |
+          node test_daily_summary_ui.cjs
+          node test_boss_controls_ui.cjs
+          node test_group_start_ui.cjs
+          node test_hover_help_ui.cjs
+      - name: Build macOS
+        if: runner.os == 'macOS'
+        shell: zsh {0}
+        run: chmod +x CookieRunQuestAssistant/packaging/build_macos.command && CookieRunQuestAssistant/packaging/build_macos.command
+      - name: Build Windows
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: CookieRunQuestAssistant\packaging\build_windows.bat
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'macOS'
+        with:
+          name: ${{ matrix.artifact }}
+          if-no-files-found: error
+          path: |
+            배포/macos/*.dmg
+            배포/macos/*.zip
+            배포/macos/SHA256.txt
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Windows'
+        with:
+          name: ${{ matrix.artifact }}
+          if-no-files-found: error
+          path: |
+            배포/windows/*-Setup.exe
+            배포/windows/SHA256.txt

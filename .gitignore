@@ -1,0 +1,19 @@
+.DS_Store
+**/.DS_Store
+**/__pycache__/
+*.pyc
+
+# 사용자별 설정·실행 기록·오류 화면
+CookieRunQuestAssistant/settings.json
+CookieRunQuestAssistant/ui_layout.json
+CookieRunQuestAssistant/channel.json
+CookieRunQuestAssistant/daily_summary.json
+CookieRunQuestAssistant/error_screenshots/
+CookieRunQuestAssistant/private_config.json
+CookieRunQuestAssistant.app/
+CookieRunQuestAssistant/*.command
+
+# 생성된 설치본과 로컬 빌드 자료
+배포/
+보관자료/
+.desktop-build-*/
