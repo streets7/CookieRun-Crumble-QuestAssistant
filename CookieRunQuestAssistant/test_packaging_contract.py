@@ -30,6 +30,18 @@ class PackagingContractTests(unittest.TestCase):
         self.assertIn("private_config.json", mac)
         self.assertIn("private_config.json", windows)
 
+    def test_desktop_builds_and_windows_installer_use_project_icon(self):
+        mac = (ROOT / "packaging" / "build_macos.command").read_text(encoding="utf-8")
+        windows = (ROOT / "packaging" / "build_windows.bat").read_text(encoding="utf-8")
+        installer = (ROOT / "packaging" / "windows_installer.iss").read_text(encoding="utf-8")
+
+        self.assertTrue((ROOT / "assets" / "app_icon.png").is_file())
+        self.assertTrue((ROOT / "packaging" / "app_icon.icns").is_file())
+        self.assertTrue((ROOT / "packaging" / "app_icon.ico").is_file())
+        self.assertIn('--icon "$PROJECT_DIR/packaging/app_icon.icns"', mac)
+        self.assertIn('--icon "%SCRIPT_DIR%app_icon.ico"', windows)
+        self.assertIn("SetupIconFile=app_icon.ico", installer)
+
 
 if __name__ == "__main__":
     unittest.main()

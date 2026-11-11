@@ -30,6 +30,7 @@ mkdir "%BUILD_DIR%\work" "%BUILD_DIR%\spec" "%OUTPUT_DIR%"
 "%BUILD_DIR%\venv\Scripts\pyinstaller.exe" ^
   --noconfirm --clean --windowed --onedir ^
   --name "%APP_NAME%" ^
+  --icon "%SCRIPT_DIR%app_icon.ico" ^
   --version-file "%SCRIPT_DIR%windows_version.txt" ^
   --paths "%WORKSPACE_DIR%" ^
   --add-data "%PROJECT_DIR%\assets;assets" ^

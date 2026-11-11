@@ -21,6 +21,7 @@ mkdir -p "$BUILD_DIR/work" "$BUILD_DIR/spec" "$OUTPUT_DIR"
 "$BUILD_DIR/venv/bin/pyinstaller" \
   --noconfirm --clean --windowed --onedir \
   --name "$APP_NAME" \
+  --icon "$PROJECT_DIR/packaging/app_icon.icns" \
   --osx-bundle-identifier "local.cqa.crumble.questassistant" \
   --paths "$WORKSPACE_DIR" \
   --add-data "$PROJECT_DIR/assets:assets" \
