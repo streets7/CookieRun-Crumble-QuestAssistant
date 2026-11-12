@@ -102,6 +102,22 @@ BOSS_PRESET_SEQUENCE = (5, 2, 3)
 SLEEP_CROWN_FALLBACK = (540, 950)
 SLEEP_CHARACTER_TARGET = (540, 1420)
 LEVEL_UP_TAP = (540, 1730)
+PET_TAB = (540, 1695)
+PET_COLLECT_ALL = (540, 1410)
+COOKIE_BATCH_UPGRADE = (370, 1570)
+COOKIE_TEAM_LEVEL = (710, 1570)
+GROWTH_NAV = (220, 1835)
+BREAKTHROUGH_TAB = (150, 1695)
+FAME_TAB = (405, 1695)
+BREAKTHROUGH_ATTACK = (220, 1550)
+BREAKTHROUGH_DEFENSE = (540, 1550)
+BREAKTHROUGH_HEALTH = (850, 1550)
+FAME_LEVEL = (900, 1515)
+GUILD_NAV = (700, 1835)
+GUILD_HELP_ENTRY = (600, 1100)
+GUILD_HELP_ALL = (540, 1600)
+GUILD_LAB_ENTRY = (340, 1450)
+GUILD_RESEARCH_SUPPORT = (300, 1580)
 
 # Challenge dungeon coordinates measured from the current 1080 x 1920 UI.
 DUNGEON_NAV = (390, 1815)
@@ -1587,6 +1603,162 @@ def allowed_integrated_action(screen: str, action: str, image: Image.Image) -> b
                 lambda r, g, b: r < 50 and g > 150 and b > 100 and g > r * 2.0,
             ) > 0.30
     return False
+
+
+def _resource_number(text: str) -> int | None:
+    compact = re.sub(r"\s+", "", text or "").upper().replace(",", "")
+    match = re.search(r"(\d+(?:\.\d+)?)\s*([KMGT]?)", compact)
+    if not match:
+        return None
+    value = float(match.group(1))
+    multiplier = {"": 1, "K": 10**3, "M": 10**6, "G": 10**9, "T": 10**12}[match.group(2)]
+    return round(value * multiplier)
+
+
+def integrated_resource_values(
+    image: Image.Image, screen: str, action: str
+) -> tuple[int | None, int | None]:
+    if screen == "breakthrough":
+        cost_boxes = {
+            "attack_level": (80, 1510, 360, 1625),
+            "defense_level": (400, 1510, 680, 1625),
+            "health_level": (710, 1510, 990, 1625),
+        }
+        cost_box = cost_boxes.get(action)
+        if cost_box is None:
+            return None, None
+        owned = _resource_number(_ocr_region(image, (790, 0, 1020, 100)))
+        cost = _resource_number(_ocr_region(image, cost_box))
+        return owned, cost
+    if screen == "fame" and action == "level":
+        owned = _resource_number(_ocr_region(image, (805, 1320, 1035, 1445)))
+        cost = _resource_number(_ocr_region(image, (805, 1500, 1035, 1605)))
+        return owned, cost
+    return None, None
+
+
+def integrated_cost_action_allowed(screen: str, action: str, image: Image.Image) -> bool:
+    if not allowed_integrated_action(screen, action, image):
+        return False
+    owned, cost = integrated_resource_values(image, screen, action)
+    return owned is not None and cost is not None and cost > 0 and owned >= cost
+
+
+def _open_integrated_screen(point, predicate, label: str) -> Image.Image:
+    current = screenshot()
+    if predicate(current):
+        return current
+    if not _main_battle_visible(current):
+        current = recover_to_battle(timeout=50)
+    tap(point, label, dry_run=False)
+    return _wait_dungeon_screen(label, predicate, timeout=20, previous=current)
+
+
+def _open_cookie_maintenance() -> Image.Image:
+    return _open_integrated_screen(COOKIE_NAV_BUTTON, cookie_maintenance_visible, "쿠키 관리 화면")
+
+
+def _open_pet_shelter() -> Image.Image:
+    cookie = _open_cookie_maintenance()
+    tap(PET_TAB, "펫 탭", dry_run=False)
+    return _wait_dungeon_screen("펫 쉼터", pet_shelter_visible, timeout=20, previous=cookie)
+
+
+def _open_growth_screen() -> Image.Image:
+    return _open_integrated_screen(GROWTH_NAV, breakthrough_visible, "돌파력 화면")
+
+
+def _open_fame_screen() -> Image.Image:
+    growth = _open_growth_screen()
+    tap(FAME_TAB, "명성 탭", dry_run=False)
+    return _wait_dungeon_screen("명성 화면", fame_visible, timeout=20, previous=growth)
+
+
+def _open_guild_home() -> Image.Image:
+    return _open_integrated_screen(GUILD_NAV, guild_home_visible, "길드 화면")
+
+
+def run_cookie_maintenance() -> str:
+    if not integrated_alerts(screenshot()).get("cookie", False):
+        return "no_alert"
+    image = _open_cookie_maintenance()
+    changed = False
+    for action, point, label in (
+        ("batch_upgrade", COOKIE_BATCH_UPGRADE, "쿠키 일괄 승급"),
+        ("team_level", COOKIE_TEAM_LEVEL, "현재 편성팀 레벨업"),
+    ):
+        if allowed_integrated_action("cookie", action, image):
+            tap(point, label, dry_run=False)
+            changed = True
+            image = screenshot()
+    return_to_main_battle()
+    return "updated" if changed else "skipped"
+
+
+def run_pet_shelter_collection() -> str:
+    if not integrated_alerts(screenshot()).get("pet", False):
+        return "no_alert"
+    image = _open_pet_shelter()
+    if not allowed_integrated_action("pet", "collect_all", image):
+        return_to_main_battle()
+        return "skipped"
+    tap(PET_COLLECT_ALL, "펫 쉼터 모두 받기", dry_run=False)
+    screenshot()
+    return_to_main_battle()
+    return "collected"
+
+
+def run_breakthrough_once() -> dict[str, bool]:
+    image = _open_growth_screen()
+    result = {"attack": False, "health": False, "defense": False}
+    actions = (
+        ("attack", "attack_level", BREAKTHROUGH_ATTACK),
+        ("health", "health_level", BREAKTHROUGH_HEALTH),
+        ("defense", "defense_level", BREAKTHROUGH_DEFENSE),
+    )
+    for name, action, point in actions:
+        if integrated_cost_action_allowed("breakthrough", action, image):
+            tap(point, f"돌파력 {name} 한 단계", dry_run=False)
+            result[name] = True
+            image = screenshot()
+    return_to_main_battle()
+    return result
+
+
+def run_fame_once() -> bool:
+    image = _open_fame_screen()
+    if not integrated_cost_action_allowed("fame", "level", image):
+        return_to_main_battle()
+        return False
+    tap(FAME_LEVEL, "명성 한 단계 레벨업", dry_run=False)
+    screenshot()
+    return_to_main_battle()
+    return True
+
+
+def run_guild_maintenance() -> dict[str, str]:
+    if not integrated_alerts(screenshot()).get("guild", False):
+        return {"status": "no_alert"}
+    result = {"help": "skipped", "research": "skipped", "support": "unsupported"}
+    home = _open_guild_home()
+    if _integrated_red_dot(home, (710, 1030, 790, 1120)):
+        tap(GUILD_HELP_ENTRY, "길드 도움 센터", dry_run=False)
+        help_screen = _wait_dungeon_screen("길드 도움 센터", guild_help_visible, timeout=20, previous=home)
+        if allowed_integrated_action("guild_help", "help_all", help_screen):
+            tap(GUILD_HELP_ALL, "길드 한 번에 돕기", dry_run=False)
+            screenshot()
+            result["help"] = "helped"
+    return_to_main_battle()
+    home = _open_guild_home()
+    tap(GUILD_LAB_ENTRY, "길드 연구소", dry_run=False)
+    lab = _wait_dungeon_screen("길드 연구소", guild_lab_visible, timeout=20, previous=home)
+    if allowed_integrated_action("guild_lab", "research_support", lab):
+        tap(GUILD_RESEARCH_SUPPORT, "길드 모두 연구 지원", dry_run=False)
+        screenshot()
+        result["research"] = "supported"
+    # Research donation is intentionally absent from every tap path.
+    return_to_main_battle()
+    return result
 
 
 def select_battle_preset(number: int):
