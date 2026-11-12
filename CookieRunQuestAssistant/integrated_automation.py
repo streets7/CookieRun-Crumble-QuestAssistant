@@ -33,32 +33,34 @@ def _task_pending(tasks: dict, task: str) -> bool:
 
 
 class StallTracker:
-    """Fire once when one stage quest and progress key stay unchanged."""
+    """Fire once after a configured number of actual same-stage attempts."""
 
-    def __init__(self, threshold: float = 180.0):
-        self.threshold = max(1.0, float(threshold))
+    def __init__(self, threshold: int = 5):
+        self.threshold = max(1, int(threshold))
         self.identity = None
-        self.started_at = None
+        self.attempts = 0
         self.triggered = False
 
     def reset(self) -> None:
         self.identity = None
-        self.started_at = None
+        self.attempts = 0
         self.triggered = False
 
     def observe(self, quest: str, screen: str, progress_key: str, at: float) -> bool:
-        if quest != "stage" or screen != "battle":
+        if screen != "battle" or quest not in ("stage", "stage_attempt"):
             self.reset()
             return False
-        identity = (quest, str(progress_key))
+        identity = str(progress_key)
         if identity != self.identity:
             self.identity = identity
-            self.started_at = float(at)
+            self.attempts = 0
             self.triggered = False
+        if quest != "stage_attempt":
             return False
-        if self.triggered or self.started_at is None:
+        if self.triggered:
             return False
-        if float(at) - self.started_at < self.threshold:
+        self.attempts += 1
+        if self.attempts < self.threshold:
             return False
         self.triggered = True
         return True

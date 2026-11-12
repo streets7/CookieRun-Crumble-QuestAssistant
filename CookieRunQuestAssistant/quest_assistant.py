@@ -3121,6 +3121,7 @@ def verified_stage_waiting():
     boss_visible_frames = 0
     summon_stage = None
     summons_for_stage = 0
+    reported_attempts = 0
     summon_limit_reported = False
     active_battle_preset = None
     next_quest_candidate = None
@@ -3172,11 +3173,21 @@ def verified_stage_waiting():
                 if stage_key != summon_stage:
                     summon_stage = stage_key
                     summons_for_stage = 0
+                    reported_attempts = 0
                     summon_limit_reported = False
                     active_battle_preset = None
                     next_quest_candidate, next_quest_frames = None, 0
                 presets = BOSS_PRESET_SEQUENCE
-                attempt_limit = len(presets) or 3
+                attempt_limit = max(
+                    5 if INTEGRATED_MAINTENANCE_REPORTER else 0,
+                    len(presets) or 3,
+                )
+                if summons_for_stage > reported_attempts:
+                    reported_attempts = summons_for_stage
+                    if INTEGRATED_MAINTENANCE_REPORTER:
+                        INTEGRATED_MAINTENANCE_REPORTER(
+                            "stage_attempt", "battle", progress_key
+                        )
                 if summons_for_stage >= attempt_limit:
                     if not summon_limit_reported:
                         stage_label = f"{current_stage[0]}-{current_stage[1]}" if current_stage else "현재 스테이지"
@@ -3189,7 +3200,9 @@ def verified_stage_waiting():
                     next_summon_at = time.monotonic() + 10
                     continue
                 movement_attempt = summons_for_stage
-                preset_number = presets[summons_for_stage] if presets else None
+                preset_number = (
+                    presets[summons_for_stage % len(presets)] if presets else None
+                )
                 preset_label = f"{preset_number}번 [{COOKIE_PRESET_NAMES[preset_number]}]" if preset_number else "현재 프리셋 유지"
                 if preset_number is not None and preset_number != active_battle_preset:
                     if summons_for_stage == 0:

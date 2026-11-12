@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parent
 class PackagingContractTests(unittest.TestCase):
     def test_mac_build_produces_v16_1_dmg_and_bundles_integrated_automation(self):
         script = (ROOT / "packaging" / "build_macos.command").read_text(encoding="utf-8")
-        self.assertIn("CookieRun-Crumble-QuestAssistant-macOS-v16.1.dmg", script)
+        self.assertIn("CookieRun-Crumble-QuestAssistant-macOS-v16.2.dmg", script)
         self.assertIn("--hidden-import desktop_app", script)
         self.assertIn("--hidden-import release_update", script)
         self.assertIn("--hidden-import integrated_automation", script)
@@ -17,7 +17,7 @@ class PackagingContractTests(unittest.TestCase):
         script = (ROOT / "packaging" / "build_windows.bat").read_text(encoding="utf-8")
         installer = ROOT / "packaging" / "windows_installer.iss"
         self.assertTrue(installer.is_file())
-        self.assertIn("CookieRun-Crumble-QuestAssistant-Windows11-v16.1-Setup.exe", script)
+        self.assertIn("CookieRun-Crumble-QuestAssistant-Windows11-v16.2-Setup.exe", script)
         self.assertIn("--hidden-import integrated_automation", script)
         self.assertIn("ISCC.exe", script)
 
@@ -27,11 +27,11 @@ class PackagingContractTests(unittest.TestCase):
         windows = (ROOT / "packaging" / "build_windows.bat").read_text(encoding="utf-8")
         installer = (ROOT / "packaging" / "windows_installer.iss").read_text(encoding="utf-8")
         version_info = (ROOT / "packaging" / "windows_version.txt").read_text(encoding="utf-8")
-        self.assertIn('APP_VERSION = "v16.1"', web)
+        self.assertIn('APP_VERSION = "v16.2"', web)
         self.assertIn("16.1", mac)
         self.assertIn("16.1", windows)
         self.assertIn('#define Version "16.1"', installer)
-        self.assertIn("filevers=(16,1,0,0), prodvers=(16,1,0,0)", version_info)
+        self.assertIn("filevers=(16,2,0,0), prodvers=(16,2,0,0)", version_info)
 
     def test_installer_source_excludes_user_generated_data(self):
         installer = (ROOT / "packaging" / "windows_installer.iss").read_text(encoding="utf-8")

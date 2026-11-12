@@ -29,10 +29,11 @@ class IntegratedOrchestratorTests(unittest.TestCase):
             now=lambda: datetime(2026, 11, 12, 12, 0, 0),
         )
 
-    def test_180_second_stall_then_runs_candidates_in_fixed_order(self):
-        tracker = StallTracker(180)
-        self.assertFalse(tracker.observe("stage", "battle", "250-30", 0))
-        self.assertTrue(tracker.observe("stage", "battle", "250-30", 180))
+    def test_fifth_stage_attempt_then_runs_candidates_in_fixed_order(self):
+        tracker = StallTracker(5)
+        for attempt in range(4):
+            self.assertFalse(tracker.observe("stage_attempt", "battle", "250-30", attempt))
+        self.assertTrue(tracker.observe("stage_attempt", "battle", "250-30", 4))
         calls = []
         runners = {
             name: lambda _day, name=name: calls.append(name) or name
@@ -192,38 +193,34 @@ class WebIntegrationTests(unittest.TestCase):
         )
         self.assertTrue(callable(engine.INTEGRATED_MAINTENANCE_REPORTER))
 
-    def test_hook_runs_after_180_seconds_and_returns_to_quest_status(self):
+    def test_hook_runs_after_five_stage_attempts_and_returns_to_quest_status(self):
         import quest_assistant as engine
         import web_ui
 
-        times = iter((0.0, 180.0))
         with mock.patch.object(engine, "STOP", False), \
                 mock.patch.object(web_ui, "run_integrated_maintenance") as run:
             run.return_value = {"attempted": ["daily"], "completed": ["daily"], "failed": {}}
             web_ui.configure_integrated_automation(
                 {"task_quest": True, "infinite": True, "integrated_automation": True},
-                clock=lambda: next(times),
             )
-            engine.INTEGRATED_MAINTENANCE_REPORTER("stage", "battle", "250-30")
-            engine.INTEGRATED_MAINTENANCE_REPORTER("stage", "battle", "250-30")
+            for _ in range(5):
+                engine.INTEGRATED_MAINTENANCE_REPORTER("stage_attempt", "battle", "250-30")
 
         run.assert_called_once()
         self.assertEqual(web_ui.STATE["status"], "무한 반복 실행 중")
 
-    def test_same_stalled_stage_can_open_a_new_window_three_minutes_later(self):
+    def test_same_stage_can_open_a_new_window_after_five_more_attempts(self):
         import quest_assistant as engine
         import web_ui
 
-        times = iter((0.0, 180.0, 181.0, 361.0))
         with mock.patch.object(engine, "STOP", False), \
                 mock.patch.object(web_ui, "run_integrated_maintenance") as run:
             run.return_value = {"attempted": [], "completed": [], "failed": {}}
             web_ui.configure_integrated_automation(
                 {"task_quest": True, "infinite": True, "integrated_automation": True},
-                clock=lambda: next(times),
             )
-            for _ in range(4):
-                engine.INTEGRATED_MAINTENANCE_REPORTER("stage", "battle", "250-30")
+            for _ in range(10):
+                engine.INTEGRATED_MAINTENANCE_REPORTER("stage_attempt", "battle", "250-30")
 
         self.assertEqual(run.call_count, 2)
 
