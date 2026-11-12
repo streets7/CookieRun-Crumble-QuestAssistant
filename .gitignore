@@ -17,3 +17,4 @@ CookieRunQuestAssistant/*.command
 배포/
 보관자료/
 .desktop-build-*/
+.worktrees/
