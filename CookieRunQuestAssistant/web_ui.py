@@ -76,6 +76,7 @@ ROOT_DIR = RESOURCE_DIR
 SETTINGS_FILE = DATA_DIR / "settings.json"
 UI_LAYOUT_FILE = DATA_DIR / "ui_layout.json"
 DAILY_SUMMARY_FILE = DATA_DIR / "daily_summary.json"
+INTEGRATED_AUTOMATION_FILE = DATA_DIR / "integrated_automation.json"
 CHANNEL_FILE = DATA_DIR / "channel.json"
 RELEASES_DIR = DATA_DIR / "releases"
 ERROR_SCREENSHOT_DIR = DATA_DIR / "error_screenshots"
