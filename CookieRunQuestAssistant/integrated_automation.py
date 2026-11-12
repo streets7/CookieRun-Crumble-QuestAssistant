@@ -136,11 +136,14 @@ def run_integrated_maintenance(
             result = runners[task](day)
             if callable(recover):
                 recover()
-            store.mark_checked(task, _result_text(result))
+            next_check_at = "다음 날"
+            if isinstance(result, dict):
+                next_check_at = result.get("next_check_at") or result.get("free_at") or next_check_at
+            store.mark_checked(task, _result_text(result), next_check_at=next_check_at)
             completed.append(task)
-            if task == "daily" and isinstance(result, dict) and "coin" in result:
+            if task == "daily" and isinstance(result, dict) and result.get("coin", 0) > 0:
                 derived.add("coin")
-            if task == "arena":
+            if task == "arena" and isinstance(result, dict) and result.get("completed", 0) > 0:
                 derived.add("arena")
             if task == "implant" and result == "complete":
                 store.set_implant_850_complete(True)

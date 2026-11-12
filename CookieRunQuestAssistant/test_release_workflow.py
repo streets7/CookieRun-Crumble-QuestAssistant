@@ -19,10 +19,11 @@ class ReleaseWorkflowTests(unittest.TestCase):
         self.assertIn("!contains(github.ref_name, '-')", text)
         self.assertLess(text.index("pip install -r requirements-runtime.txt"), text.index("python -m unittest discover -q"))
 
-    def test_release_uploads_exact_v16_installer_types(self):
+    def test_release_uploads_exact_v16_1_installer_types(self):
         text = (ROOT / ".github" / "workflows" / "release-desktop.yml").read_text(encoding="utf-8")
-        self.assertIn("CookieRun-Crumble-QuestAssistant-macOS-v16.0.dmg", text)
-        self.assertIn("CookieRun-Crumble-QuestAssistant-Windows11-v16.0-Setup.exe", text)
+        self.assertIn("CookieRun-Crumble-QuestAssistant-macOS-v16.1.dmg", text)
+        self.assertIn("CookieRun-Crumble-QuestAssistant-Windows11-v16.1-Setup.exe", text)
+        self.assertIn("node test_integrated_automation_ui.cjs", text)
         self.assertIn("SHA256.txt", text)
 
     def test_manual_windows_artifact_contains_setup_exe(self):

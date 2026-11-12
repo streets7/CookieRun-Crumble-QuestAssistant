@@ -31,11 +31,18 @@ class IntegratedScreenCatalogTests(unittest.TestCase):
             "guild_entry.png": engine.guild_home_visible,
             "guild_help.png": engine.guild_help_visible,
             "guild_lab.png": engine.guild_lab_visible,
-            "daily_menu.png": engine.integrated_ad_pass_visible,
         }
         for name, predicate in cases.items():
             with self.subTest(name=name):
                 self.assertTrue(predicate(fixture(name)))
+
+    def test_ambiguous_daily_skip_marker_is_not_enough_to_confirm_ad_pass(self):
+        self.assertFalse(engine.integrated_ad_pass_visible(fixture("daily_menu.png")))
+
+    def test_implant_850_completion_is_read_from_confirmed_challenge_menu(self):
+        self.assertTrue(engine.implant_850_complete_visible(
+            fixture("challenge_menu_red_dot.png")
+        ))
 
     def test_only_observed_safe_actions_are_allowed(self):
         self.assertFalse(engine.allowed_integrated_action(

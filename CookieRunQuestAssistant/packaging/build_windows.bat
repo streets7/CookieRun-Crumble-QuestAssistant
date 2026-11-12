@@ -38,6 +38,7 @@ mkdir "%BUILD_DIR%\work" "%BUILD_DIR%\spec" "%OUTPUT_DIR%"
   --add-data "%PROJECT_DIR%\private_config.json;." ^
   --hidden-import desktop_app ^
   --hidden-import release_update ^
+  --hidden-import integrated_automation ^
   --workpath "%BUILD_DIR%\work" ^
   --specpath "%BUILD_DIR%\spec" ^
   --distpath "%OUTPUT_DIR%" ^
@@ -54,9 +55,9 @@ if not exist "%ISCC%" (
   echo Inno Setup 6 ISCC.exe was not found.
   exit /b 1
 )
-"%ISCC%" /DSourceDir="%OUTPUT_DIR%\%APP_NAME%" /DOutputDir="%OUTPUT_DIR%" /DVersion="16.0" "%SCRIPT_DIR%windows_installer.iss"
+"%ISCC%" /DSourceDir="%OUTPUT_DIR%\%APP_NAME%" /DOutputDir="%OUTPUT_DIR%" /DVersion="16.1" "%SCRIPT_DIR%windows_installer.iss"
 if errorlevel 1 exit /b 1
-powershell.exe -NoProfile -Command "Get-FileHash '%OUTPUT_DIR%\CookieRun-Crumble-QuestAssistant-Windows11-v16.0-Setup.exe' -Algorithm SHA256 | ForEach-Object { $_.Hash + '  ' + [IO.Path]::GetFileName($_.Path) } | Set-Content -Encoding ascii '%OUTPUT_DIR%\SHA256.txt'"
+powershell.exe -NoProfile -Command "Get-FileHash '%OUTPUT_DIR%\CookieRun-Crumble-QuestAssistant-Windows11-v16.1-Setup.exe' -Algorithm SHA256 | ForEach-Object { $_.Hash + '  ' + [IO.Path]::GetFileName($_.Path) } | Set-Content -Encoding ascii '%OUTPUT_DIR%\SHA256.txt'"
 if errorlevel 1 exit /b 1
 echo Built: %OUTPUT_DIR%
 endlocal

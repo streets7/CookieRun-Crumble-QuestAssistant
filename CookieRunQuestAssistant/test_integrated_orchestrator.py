@@ -141,6 +141,34 @@ class IntegratedOrchestratorTests(unittest.TestCase):
         self.assertEqual(first_calls.count("recover"), 4)
         self.assertEqual(second["attempted"], [])
 
+    def test_growth_requires_positive_coin_and_arena_completion(self):
+        calls = []
+        run_integrated_maintenance(
+            self.store,
+            lambda: {},
+            {
+                "daily": lambda _day: {"coin": 0},
+                "arena": lambda _day: {"completed": 0},
+                "breakthrough": lambda _day: calls.append("breakthrough"),
+                "fame": lambda _day: calls.append("fame"),
+            },
+        )
+        self.assertEqual(calls, [])
+
+    def test_persists_per_content_result_and_next_check(self):
+        run_integrated_maintenance(
+            self.store,
+            lambda: {},
+            {
+                "daily": lambda _day: {"exp": 1, "coin": 2},
+                "arena": lambda _day: {"completed": 0, "free_at": "14시간 후"},
+            },
+        )
+        tasks = self.store.today()["tasks"]
+        self.assertIn('"coin": 2', tasks["daily"]["result"])
+        self.assertEqual(tasks["daily"]["next_check_at"], "다음 날")
+        self.assertEqual(tasks["arena"]["next_check_at"], "14시간 후")
+
 
 class WebIntegrationTests(unittest.TestCase):
     def tearDown(self):
@@ -181,6 +209,39 @@ class WebIntegrationTests(unittest.TestCase):
 
         run.assert_called_once()
         self.assertEqual(web_ui.STATE["status"], "무한 반복 실행 중")
+
+    def test_same_stalled_stage_can_open_a_new_window_three_minutes_later(self):
+        import quest_assistant as engine
+        import web_ui
+
+        times = iter((0.0, 180.0, 181.0, 361.0))
+        with mock.patch.object(engine, "STOP", False), \
+                mock.patch.object(web_ui, "run_integrated_maintenance") as run:
+            run.return_value = {"attempted": [], "completed": [], "failed": {}}
+            web_ui.configure_integrated_automation(
+                {"task_quest": True, "infinite": True, "integrated_automation": True},
+                clock=lambda: next(times),
+            )
+            for _ in range(4):
+                engine.INTEGRATED_MAINTENANCE_REPORTER("stage", "battle", "250-30")
+
+        self.assertEqual(run.call_count, 2)
+
+    def test_completed_stage_resets_hook_without_launching_maintenance(self):
+        import quest_assistant as engine
+
+        reporter = mock.Mock()
+        image = object()
+        with mock.patch.object(engine, "STOP", False), \
+                mock.patch.object(engine, "INTEGRATED_MAINTENANCE_REPORTER", reporter), \
+                mock.patch.object(engine, "screenshot", return_value=image), \
+                mock.patch.object(engine, "screen_state", return_value="battle"), \
+                mock.patch.object(engine, "quest_complete", return_value=True), \
+                mock.patch.object(engine, "current_stage_number", return_value=(250, 30)), \
+                mock.patch.object(engine, "claim_reward_verified"):
+            engine.verified_stage_waiting()
+
+        reporter.assert_called_once_with("complete", "battle", "250-30")
 
 
 if __name__ == "__main__":

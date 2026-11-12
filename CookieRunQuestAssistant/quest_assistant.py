@@ -191,6 +191,7 @@ ERROR_REPORTER = None
 PROGRESS_REPORTER = None
 ARENA_DECISION_REPORTER = None
 INTEGRATED_MAINTENANCE_REPORTER = None
+LAST_ARENA_FREE_AT = None
 LAST_FOREGROUND_CHECK = None
 LAST_FOREGROUND_RESULT = None
 FOREGROUND_CHECK_INTERVAL = 2.5
@@ -1557,11 +1558,19 @@ def guild_lab_visible(image: Image.Image) -> bool:
 def integrated_ad_pass_visible(image: Image.Image) -> bool:
     if not daily_tab_active(image):
         return False
-    orange_skip = pixel_fraction(
-        image, (790, 930, 930, 1080),
-        lambda r, g, b: r > 165 and 45 < g < 150 and b < 90 and r > b * 1.8,
-    )
-    return orange_skip > 0.06
+    text = _ocr_region(image, (680, 780, 1040, 1200)).replace(" ", "").lower()
+    return "광고패스" in text or "adpass" in text
+
+
+def implant_850_complete_visible(image: Image.Image) -> bool:
+    if not challenge_menu_visible(image):
+        return False
+    reference_path = ASSETS / "implant_850_complete.png"
+    if not reference_path.is_file():
+        return False
+    sample = image.crop((800, 1270, 1070, 1410)).convert("RGB")
+    with Image.open(reference_path) as reference:
+        return image_difference(sample, reference.convert("RGB")) < 0.015
 
 
 def allowed_integrated_action(screen: str, action: str, image: Image.Image) -> bool:
@@ -2060,6 +2069,14 @@ def arena_free_refresh_available(image: Image.Image) -> bool:
     )
 
 
+def arena_refresh_wait_text(image: Image.Image):
+    offset = 112 if wagle_arena_opponents_visible(image) else 0
+    text = re.sub(r"\s+", " ", _ocr_region(
+        image, (760, 1310 + offset, 1075, 1535 + offset)
+    )).strip()
+    return text[:32] if re.search(r"\d+\s*(?:시간|분|초)|후|남", text) else None
+
+
 def _arena_match_description(values) -> str:
     opponent_power, opponent_trophies, my_power, my_trophies = values
     def power_label(value):
@@ -2200,7 +2217,15 @@ def integrated_daily_entry_allowed(image: Image.Image, ad_pass_confirmed: bool) 
     keys = daily_key_count(image)
     if keys is not None and keys > 0:
         return True
-    return keys == 0 and bool(ad_pass_confirmed)
+    return keys == 0 and bool(ad_pass_confirmed) and daily_ad_pass_applied(image)
+
+
+def daily_ad_pass_applied(image: Image.Image) -> bool:
+    """Require a second, detail-screen proof before any zero-key entry."""
+    if not daily_detail_screen(image):
+        return False
+    text = _ocr_region(image, (260, 1400, 820, 1640)).replace(" ", "").lower()
+    return "광고패스" in text or "adpass" in text
 
 
 def daily_menu_visible(image: Image.Image) -> bool:
@@ -3104,21 +3129,30 @@ def verified_stage_waiting():
         check_stop()
         image = screenshot()
         state = screen_state(image)
-        if INTEGRATED_MAINTENANCE_REPORTER:
-            stage_number = current_stage_number(image) if state == "battle" else None
-            progress_key = (
-                f"{stage_number[0]}-{stage_number[1]}" if stage_number else "unknown"
-            )
-            INTEGRATED_MAINTENANCE_REPORTER("stage", state, progress_key)
         if state == "equipment_compare":
             print("  스테이지 완료 대기 중 장착/판매 팝업을 처리합니다.")
             resolve_equipment_comparisons(image, state)
             continue
+        stage_number = current_stage_number(image) if state == "battle" else None
+        progress_key = (
+            f"{stage_number[0]}-{stage_number[1]}" if stage_number else "unknown"
+        )
         if state == "battle" and quest_complete(image):
+            if INTEGRATED_MAINTENANCE_REPORTER:
+                INTEGRATED_MAINTENANCE_REPORTER("complete", state, progress_key)
             print("  스테이지 클리어 완료 표시 확인: 숫자 비교 없이 보상을 받습니다.")
             break
+        detected_name, detected_confidence = ("unknown", 0.0)
+        if state == "battle":
+            detected_name, detected_confidence = detect_quest(image, assume_battle=True)
+        if INTEGRATED_MAINTENANCE_REPORTER:
+            report_quest = (
+                detected_name if detected_confidence >= 0.56 else
+                ("stage" if state == "battle" else "unknown")
+            )
+            INTEGRATED_MAINTENANCE_REPORTER(report_quest, state, progress_key)
         if summons_for_stage >= (len(BOSS_PRESET_SEQUENCE) or 3) and state == "battle":
-            name, confidence = detect_quest(image, assume_battle=True)
+            name, confidence = detected_name, detected_confidence
             if name not in ("unknown", "stage") and confidence >= 0.56:
                 if name == next_quest_candidate:
                     next_quest_frames += 1
@@ -4027,6 +4061,7 @@ def run_arena_decision_only(mode="compare", arena_kind=None):
 
 
 def run_arena(runs: int) -> int:
+    global LAST_ARENA_FREE_AT
     completed = 0
     home = open_challenge_dungeon("arena")
     tap(ARENA_ENTER, "아레나 도전 상대 보기", dry_run=False)
@@ -4072,6 +4107,7 @@ def run_arena(runs: int) -> int:
                     leave_arena = True
                     break
                 if not arena_free_refresh_available(opponents):
+                    LAST_ARENA_FREE_AT = arena_refresh_wait_text(opponents)
                     print("  새로고침 대기시간 또는 크리스탈 비용을 확인했습니다. 크리스탈을 사용하지 않고 퀘스트로 복귀합니다.")
                     leave_arena = True
                     break
@@ -4392,7 +4428,8 @@ def _run_daily_fixed(detail: Image.Image, label: str, runs: int) -> tuple[Image.
 
 
 def _run_daily_continuous(
-    detail: Image.Image, label: str, allow_ad_pass: bool = True
+    detail: Image.Image, label: str, allow_ad_pass: bool = True,
+    service_quests: bool = True,
 ) -> tuple[Image.Image, int]:
     """Run until both keys and the paid ad-skip entry become unavailable."""
     detail = _set_daily_continuous(detail, True)
@@ -4403,7 +4440,7 @@ def _run_daily_continuous(
     completed = 0
     clear_visible = False
     exhausted_frames = 0
-    service_quests = True
+    service_quests = bool(service_quests)
     next_quest_check_at = time.monotonic() + 1.0
     deadline = time.monotonic() + 2700
     tap(DAILY_START, f"{label} 연속 도전 시작", dry_run=False)
@@ -4494,6 +4531,7 @@ def run_daily_dungeon_sequence(
     dry_run: bool = False,
     allow_ad_pass: bool = True,
     continue_on_failure: bool = False,
+    service_quests: bool = True,
 ) -> dict[str, int]:
     labels = {
         "exp": "경험치 던전", "coin": "코인 던전", "dough": "반죽 던전",
@@ -4512,6 +4550,7 @@ def run_daily_dungeon_sequence(
 
     detail = open_daily_dungeon(selected[0][0])
     completed_by_kind = {}
+    failures = []
     for index, (kind, runs, continuous) in enumerate(selected):
         label = labels[kind]
         mode = "열쇠·광고 스킵 소진" if continuous else f"{runs}회"
@@ -4519,7 +4558,8 @@ def run_daily_dungeon_sequence(
         try:
             if continuous:
                 detail, completed = _run_daily_continuous(
-                    detail, label, allow_ad_pass=allow_ad_pass
+                    detail, label, allow_ad_pass=allow_ad_pass,
+                    service_quests=service_quests,
                 )
             else:
                 detail, completed = _run_daily_fixed(detail, label, runs)
@@ -4528,6 +4568,7 @@ def run_daily_dungeon_sequence(
                 raise
             print(f"  {label} 진행 실패: {error} · 다음 일일 던전으로 이동합니다.")
             completed_by_kind[kind] = 0
+            failures.append(f"{label}: {error}")
             return_to_main_battle()
             if index + 1 < len(selected):
                 detail = open_daily_dungeon(selected[index + 1][0])
@@ -4543,6 +4584,11 @@ def run_daily_dungeon_sequence(
             detail = _advance_daily_dungeon(detail, kind, selected[index + 1][0])
 
     return_to_main_battle()
+    if failures:
+        progress = ", ".join(
+            f"{kind}={completed_by_kind.get(kind, 0)}" for kind, _, _ in selected
+        )
+        raise SafeStop(f"{' · '.join(failures)} · 진행 {progress}")
     return completed_by_kind
 
 
@@ -4563,27 +4609,32 @@ def run_integrated_daily_dungeons(state: dict) -> dict[str, int]:
         dry_run=False,
         allow_ad_pass=bool(confirmed),
         continue_on_failure=True,
+        service_quests=False,
     )
 
 
 def run_integrated_crumble(state: dict) -> int:
-    completed = max(0, int(state.get("crumble_completed", 0)))
-    remaining = max(0, 4 - completed)
-    return run_crumble_dungeon(remaining) if remaining else 0
+    return run_crumble_dungeon(4)
 
 
 def run_integrated_arena(state: dict) -> dict:
+    global LAST_ARENA_FREE_AT
+    LAST_ARENA_FREE_AT = None
     completed = run_arena(5)
-    return {"completed": completed, "free_at": state.get("arena_free_at")}
+    return {
+        "completed": completed,
+        "free_at": LAST_ARENA_FREE_AT or state.get("arena_free_at") or "다음 날",
+    }
 
 
 def run_integrated_implant(state: dict) -> str:
     if state.get("implant_850_complete"):
         return "complete"
-    try:
-        completed = run_implant_tower(1)
-    except SafeStop:
-        return "failed"
+    menu = open_challenge_menu()
+    if implant_850_complete_visible(menu):
+        return_to_main_battle()
+        return "complete"
+    completed = run_implant_tower(1)
     return "cleared" if completed else "unavailable"
 
 

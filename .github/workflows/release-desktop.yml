@@ -13,9 +13,9 @@ jobs:
       matrix:
         include:
           - os: macos-14
-            artifact: macos-v16.0
+            artifact: macos-v16.1
           - os: windows-2022
-            artifact: windows-v16.0
+            artifact: windows-v16.1
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -57,6 +57,7 @@ jobs:
           node test_boss_controls_ui.cjs
           node test_group_start_ui.cjs
           node test_hover_help_ui.cjs
+          node test_integrated_automation_ui.cjs
       - name: Build macOS
         if: runner.os == 'macOS'
         shell: zsh {0}
@@ -71,7 +72,7 @@ jobs:
           name: ${{ matrix.artifact }}
           if-no-files-found: error
           path: |
-            배포/macos/CookieRun-Crumble-QuestAssistant-macOS-v16.0.dmg
+            배포/macos/CookieRun-Crumble-QuestAssistant-macOS-v16.1.dmg
             배포/macos/SHA256.txt
       - uses: actions/upload-artifact@v4
         if: runner.os == 'Windows'
@@ -79,7 +80,7 @@ jobs:
           name: ${{ matrix.artifact }}
           if-no-files-found: error
           path: |
-            배포/windows/CookieRun-Crumble-QuestAssistant-Windows11-v16.0-Setup.exe
+            배포/windows/CookieRun-Crumble-QuestAssistant-Windows11-v16.1-Setup.exe
             배포/windows/SHA256.txt
 
   release:
@@ -91,11 +92,11 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: macos-v16.0
+          name: macos-v16.1
           path: release-assets/macos
       - uses: actions/download-artifact@v4
         with:
-          name: windows-v16.0
+          name: windows-v16.1
           path: release-assets/windows
       - name: Name platform checksums
         run: |
@@ -106,7 +107,7 @@ jobs:
           generate_release_notes: true
           prerelease: false
           files: |
-            release-assets/macos/CookieRun-Crumble-QuestAssistant-macOS-v16.0.dmg
-            release-assets/windows/CookieRun-Crumble-QuestAssistant-Windows11-v16.0-Setup.exe
+            release-assets/macos/CookieRun-Crumble-QuestAssistant-macOS-v16.1.dmg
+            release-assets/windows/CookieRun-Crumble-QuestAssistant-Windows11-v16.1-Setup.exe
             release-assets/SHA256-macOS.txt
             release-assets/SHA256-Windows.txt
