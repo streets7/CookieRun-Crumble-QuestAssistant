@@ -2014,6 +2014,23 @@ def daily_start_available(image: Image.Image) -> bool:
     )
 
 
+def daily_key_count(image: Image.Image) -> int | None:
+    """Read the current daily-dungeon key count; unreadable is never zero."""
+    text = _ocr_region(image, (410, 0, 570, 100))
+    numbers = re.findall(r"\d+", text)
+    return int(numbers[-1]) if numbers else None
+
+
+def integrated_daily_entry_allowed(image: Image.Image, ad_pass_confirmed: bool) -> bool:
+    """Allow a start only for a readable key or a positively confirmed ad pass."""
+    if not daily_start_available(image):
+        return False
+    keys = daily_key_count(image)
+    if keys is not None and keys > 0:
+        return True
+    return keys == 0 and bool(ad_pass_confirmed)
+
+
 def daily_menu_visible(image: Image.Image) -> bool:
     if daily_achievement_visible(image) or daily_clear_visible(image):
         return False
@@ -4131,6 +4148,7 @@ def _verify_daily_attempts(
     completed: int,
     requested: int,
     continuous: bool,
+    allow_ad_pass: bool = True,
 ) -> Image.Image:
     """Verify the actual clear count and the final Challenge button state."""
     print(f"  확인: {label} 도전하기! 횟수 및 종료 상태")
@@ -4145,7 +4163,10 @@ def _verify_daily_attempts(
             time.sleep(0.45)
             continue
         latest = image
-        available = daily_start_available(image)
+        available = (
+            integrated_daily_entry_allowed(image, allow_ad_pass)
+            if continuous else daily_start_available(image)
+        )
         if continuous:
             stable = stable + 1 if not available else 0
             if stable >= 3:
@@ -4198,10 +4219,12 @@ def _run_daily_fixed(detail: Image.Image, label: str, runs: int) -> tuple[Image.
     return detail, completed
 
 
-def _run_daily_continuous(detail: Image.Image, label: str) -> tuple[Image.Image, int]:
+def _run_daily_continuous(
+    detail: Image.Image, label: str, allow_ad_pass: bool = True
+) -> tuple[Image.Image, int]:
     """Run until both keys and the paid ad-skip entry become unavailable."""
     detail = _set_daily_continuous(detail, True)
-    if not daily_start_available(detail):
+    if not integrated_daily_entry_allowed(detail, allow_ad_pass):
         print(f"  {label} 열쇠와 광고 스킵 도전이 이미 소진되어 있습니다.")
         return detail, 0
 
@@ -4234,7 +4257,7 @@ def _run_daily_continuous(detail: Image.Image, label: str) -> tuple[Image.Image,
             continue
         clear_visible = False
         if daily_detail_screen(image):
-            if daily_start_available(image):
+            if integrated_daily_entry_allowed(image, allow_ad_pass):
                 # Keys may have reached zero while the paid ad-skip entry is
                 # still orange. Start it and continue waiting for gray.
                 print(f"  {label} 도전 버튼 활성 확인: 남은 열쇠 또는 광고 스킵을 계속 사용합니다.")
@@ -4294,7 +4317,12 @@ def _advance_daily_dungeon(detail: Image.Image, current: str, target: str) -> Im
     return detail
 
 
-def run_daily_dungeon_sequence(tasks, dry_run: bool = False) -> dict[str, int]:
+def run_daily_dungeon_sequence(
+    tasks,
+    dry_run: bool = False,
+    allow_ad_pass: bool = True,
+    continue_on_failure: bool = False,
+) -> dict[str, int]:
     labels = {
         "exp": "경험치 던전", "coin": "코인 던전", "dough": "반죽 던전",
         "research_stone": "연구석 던전", "rune_crystal": "룬결정 던전",
@@ -4316,12 +4344,27 @@ def run_daily_dungeon_sequence(tasks, dry_run: bool = False) -> dict[str, int]:
         label = labels[kind]
         mode = "열쇠·광고 스킵 소진" if continuous else f"{runs}회"
         print(f"\n---------- 일일 던전: {label} · {mode} ----------")
-        if continuous:
-            detail, completed = _run_daily_continuous(detail, label)
-        else:
-            detail, completed = _run_daily_fixed(detail, label, runs)
+        try:
+            if continuous:
+                detail, completed = _run_daily_continuous(
+                    detail, label, allow_ad_pass=allow_ad_pass
+                )
+            else:
+                detail, completed = _run_daily_fixed(detail, label, runs)
+        except SafeStop as error:
+            if not continue_on_failure or STOP or isinstance(error, SkipAction):
+                raise
+            print(f"  {label} 진행 실패: {error} · 다음 일일 던전으로 이동합니다.")
+            completed_by_kind[kind] = 0
+            return_to_main_battle()
+            if index + 1 < len(selected):
+                detail = open_daily_dungeon(selected[index + 1][0])
+            continue
         completed_by_kind[kind] = completed
-        detail = _verify_daily_attempts(detail, label, completed, runs, continuous)
+        detail = _verify_daily_attempts(
+            detail, label, completed, runs, continuous,
+            allow_ad_pass=allow_ad_pass,
+        )
         detail = _collect_daily_achievement(detail, label)
         print(f"---------- {label} 종료: {completed}회 ----------\n")
         if index + 1 < len(selected):
@@ -4336,6 +4379,40 @@ def run_daily_dungeon(
 ) -> int:
     result = run_daily_dungeon_sequence(((kind, runs, continuous),), dry_run=dry_run)
     return result.get(kind, 0)
+
+
+def run_integrated_daily_dungeons(state: dict) -> dict[str, int]:
+    confirmed = state.get("ad_pass_confirmed")
+    if confirmed is None:
+        confirmed = integrated_ad_pass_visible(open_daily_menu())
+    tasks = tuple((kind, 3, True) for kind in DAILY_ORDER)
+    return run_daily_dungeon_sequence(
+        tasks,
+        dry_run=False,
+        allow_ad_pass=bool(confirmed),
+        continue_on_failure=True,
+    )
+
+
+def run_integrated_crumble(state: dict) -> int:
+    completed = max(0, int(state.get("crumble_completed", 0)))
+    remaining = max(0, 4 - completed)
+    return run_crumble_dungeon(remaining) if remaining else 0
+
+
+def run_integrated_arena(state: dict) -> dict:
+    completed = run_arena(5)
+    return {"completed": completed, "free_at": state.get("arena_free_at")}
+
+
+def run_integrated_implant(state: dict) -> str:
+    if state.get("implant_850_complete"):
+        return "complete"
+    try:
+        completed = run_implant_tower(1)
+    except SafeStop:
+        return "failed"
+    return "cleared" if completed else "unavailable"
 
 
 def run_dynamic(cycles: int, dry_run: bool, infinite: bool = False):
