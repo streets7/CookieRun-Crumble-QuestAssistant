@@ -35,7 +35,7 @@ mkdir -p "$BUILD_DIR/work" "$BUILD_DIR/spec" "$OUTPUT_DIR"
   --distpath "$OUTPUT_DIR" \
   app_entry.py
 
-/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 16.1" "$OUTPUT_DIR/$APP_NAME.app/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 16.2" "$OUTPUT_DIR/$APP_NAME.app/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string 160100" "$OUTPUT_DIR/$APP_NAME.app/Contents/Info.plist"
 codesign --force --deep --sign - "$OUTPUT_DIR/$APP_NAME.app"
 ditto -c -k --sequesterRsrc --keepParent \

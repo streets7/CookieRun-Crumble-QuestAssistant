@@ -5,7 +5,7 @@
   #error OutputDir must be supplied by build_windows.bat
 #endif
 #ifndef Version
-  #define Version "16.1"
+  #define Version "16.2"
 #endif
 
 [Setup]

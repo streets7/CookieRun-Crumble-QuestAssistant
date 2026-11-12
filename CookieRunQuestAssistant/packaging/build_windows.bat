@@ -55,7 +55,7 @@ if not exist "%ISCC%" (
   echo Inno Setup 6 ISCC.exe was not found.
   exit /b 1
 )
-"%ISCC%" /DSourceDir="%OUTPUT_DIR%\%APP_NAME%" /DOutputDir="%OUTPUT_DIR%" /DVersion="16.1" "%SCRIPT_DIR%windows_installer.iss"
+"%ISCC%" /DSourceDir="%OUTPUT_DIR%\%APP_NAME%" /DOutputDir="%OUTPUT_DIR%" /DVersion="16.2" "%SCRIPT_DIR%windows_installer.iss"
 if errorlevel 1 exit /b 1
 powershell.exe -NoProfile -Command "Get-FileHash '%OUTPUT_DIR%\CookieRun-Crumble-QuestAssistant-Windows11-v16.2-Setup.exe' -Algorithm SHA256 | ForEach-Object { $_.Hash + '  ' + [IO.Path]::GetFileName($_.Path) } | Set-Content -Encoding ascii '%OUTPUT_DIR%\SHA256.txt'"
 if errorlevel 1 exit /b 1

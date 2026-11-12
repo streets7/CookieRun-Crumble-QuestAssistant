@@ -28,9 +28,9 @@ class PackagingContractTests(unittest.TestCase):
         installer = (ROOT / "packaging" / "windows_installer.iss").read_text(encoding="utf-8")
         version_info = (ROOT / "packaging" / "windows_version.txt").read_text(encoding="utf-8")
         self.assertIn('APP_VERSION = "v16.2"', web)
-        self.assertIn("16.1", mac)
-        self.assertIn("16.1", windows)
-        self.assertIn('#define Version "16.1"', installer)
+        self.assertIn("16.2", mac)
+        self.assertIn("16.2", windows)
+        self.assertIn('#define Version "16.2"', installer)
         self.assertIn("filevers=(16,2,0,0), prodvers=(16,2,0,0)", version_info)
 
     def test_installer_source_excludes_user_generated_data(self):

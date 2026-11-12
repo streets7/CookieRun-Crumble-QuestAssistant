@@ -4,7 +4,7 @@ VSVersionInfo(
     StringStruct('FileDescription', 'CookieRun Crumble Quest Assistant'),
     StringStruct('FileVersion', '16.2.0.0'),
     StringStruct('ProductName', 'CookieRun Crumble Quest Assistant'),
-    StringStruct('ProductVersion', '16.1'),
+    StringStruct('ProductVersion', '16.2'),
     StringStruct('OriginalFilename', 'CookieRun Crumble Quest Assistant.exe')
   ])]), VarFileInfo([VarStruct('Translation', [1033, 1200])])]
 )
