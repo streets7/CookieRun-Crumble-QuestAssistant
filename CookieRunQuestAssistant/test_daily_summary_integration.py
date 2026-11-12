@@ -56,6 +56,13 @@ class DailySummaryIntegrationTests(unittest.TestCase):
         self.assertNotIn("integrated_automation", web_ui.status_payload(False))
         self.assertIn("integrated_automation", private)
 
+    def test_execution_logs_are_visible_without_admin_access(self):
+        old_logs = web_ui.STATE["logs"]
+        web_ui.STATE["logs"] = ["실행 로그 확인\n"]
+        self.addCleanup(web_ui.STATE.__setitem__, "logs", old_logs)
+
+        self.assertEqual(web_ui.status_payload(False)["logs"], "실행 로그 확인\n")
+
 
 if __name__ == "__main__":
     unittest.main()

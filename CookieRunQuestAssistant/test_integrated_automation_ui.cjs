@@ -25,5 +25,7 @@ assert.ok(hideGuardMatch, 'execution log visibility guard must exist');
 vm.runInNewContext(hideGuardMatch[0] + ';this.canHide=canHideFeature;', context);
 assert.equal(context.canHide('card_adminLogs'), false);
 assert.equal(context.canHide('card_settingsCard'), true);
+assert.match(source, /<section id="adminLogs" class="card">/);
+assert.doesNotMatch(script, /getElementById\('adminLogs'\)\.classList\.toggle\('hidden'/);
 
 console.log('Integrated automation UI: five repeats, persistence, admin status and stale poll guard passed.');
