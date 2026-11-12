@@ -174,6 +174,7 @@ QUEST_TEMPLATE_BITS = {}
 ERROR_REPORTER = None
 PROGRESS_REPORTER = None
 ARENA_DECISION_REPORTER = None
+INTEGRATED_MAINTENANCE_REPORTER = None
 LAST_FOREGROUND_CHECK = None
 LAST_FOREGROUND_RESULT = None
 FOREGROUND_CHECK_INTERVAL = 2.5
@@ -2767,6 +2768,12 @@ def verified_stage_waiting():
         check_stop()
         image = screenshot()
         state = screen_state(image)
+        if INTEGRATED_MAINTENANCE_REPORTER:
+            stage_number = current_stage_number(image) if state == "battle" else None
+            progress_key = (
+                f"{stage_number[0]}-{stage_number[1]}" if stage_number else "unknown"
+            )
+            INTEGRATED_MAINTENANCE_REPORTER("stage", state, progress_key)
         if state == "equipment_compare":
             print("  스테이지 완료 대기 중 장착/판매 팝업을 처리합니다.")
             resolve_equipment_comparisons(image, state)

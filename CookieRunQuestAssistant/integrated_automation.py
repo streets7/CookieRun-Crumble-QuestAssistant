@@ -10,6 +10,74 @@ from pathlib import Path
 from typing import Callable, Optional
 
 
+MAINTENANCE_ORDER = (
+    "daily", "crumble", "arena", "implant", "guild",
+    "cookie", "pet", "breakthrough", "fame",
+)
+DAILY_EXCEPTIONS = ("daily", "crumble", "arena", "implant")
+ALERT_TASKS = ("guild", "cookie", "pet")
+
+
+class StallTracker:
+    """Fire once when one stage quest and progress key stay unchanged."""
+
+    def __init__(self, threshold: float = 180.0):
+        self.threshold = max(1.0, float(threshold))
+        self.identity = None
+        self.started_at = None
+        self.triggered = False
+
+    def reset(self) -> None:
+        self.identity = None
+        self.started_at = None
+        self.triggered = False
+
+    def observe(self, quest: str, screen: str, progress_key: str, at: float) -> bool:
+        if quest != "stage" or screen != "battle":
+            self.reset()
+            return False
+        identity = (quest, str(progress_key))
+        if identity != self.identity:
+            self.identity = identity
+            self.started_at = float(at)
+            self.triggered = False
+            return False
+        if self.triggered or self.started_at is None:
+            return False
+        if float(at) - self.started_at < self.threshold:
+            return False
+        self.triggered = True
+        return True
+
+
+def build_candidates(day: dict, alerts: dict[str, bool], completed: set[str]) -> list[str]:
+    """Return safe maintenance candidates in the fixed user-approved order."""
+    tasks = day.get("tasks", {}) if isinstance(day, dict) else {}
+    tasks = tasks if isinstance(tasks, dict) else {}
+    alerts = alerts if isinstance(alerts, dict) else {}
+    completed = {str(item) for item in completed}
+    candidates = []
+
+    for task in DAILY_EXCEPTIONS:
+        if task == "implant" and bool(day.get("implant_850_complete", False)):
+            continue
+        if task not in tasks:
+            candidates.append(task)
+
+    for task in ALERT_TASKS:
+        task_state = tasks.get(task)
+        disabled = isinstance(task_state, dict) and bool(task_state.get("disabled", False))
+        if alerts.get(task, False) and task not in tasks and not disabled:
+            candidates.append(task)
+
+    if "coin" in completed and "breakthrough" not in tasks and "breakthrough" not in completed:
+        candidates.append("breakthrough")
+    if "arena" in completed and "fame" not in tasks and "fame" not in completed:
+        candidates.append("fame")
+
+    return [task for task in MAINTENANCE_ORDER if task in candidates]
+
+
 class IntegratedAutomationStore:
     """Keep daily automation state without mixing it with user settings."""
 
