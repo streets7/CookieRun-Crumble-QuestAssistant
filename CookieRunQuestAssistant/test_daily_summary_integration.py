@@ -53,6 +53,8 @@ class DailySummaryIntegrationTests(unittest.TestCase):
         self.assertEqual(private["daily_summary"]["runs"], 1)
         self.assertEqual(private["daily_summary"]["version"], web_ui.APP_VERSION)
         self.assertEqual(private["daily_summary"]["deployment"]["windows"], "실제 실행 검증 필요")
+        self.assertNotIn("integrated_automation", web_ui.status_payload(False))
+        self.assertIn("integrated_automation", private)
 
 
 if __name__ == "__main__":

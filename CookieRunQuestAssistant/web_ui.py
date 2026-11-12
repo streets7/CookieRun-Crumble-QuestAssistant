@@ -24,6 +24,7 @@ import release_update
 from daily_summary import DailySummaryStore
 from integrated_automation import (
     IntegratedAutomationStore,
+    MAINTENANCE_ORDER,
     StallTracker,
     run_integrated_maintenance,
 )
@@ -108,6 +109,7 @@ BUILD_ID = source_build_id()
 
 DEFAULTS = {
     "cycles": 1, "infinite": False, "automatic_check": False, "dry_run": False,
+    "integrated_automation": False, "integrated_stall_seconds": 180,
     "adjust_screen_size": True, "screen_width": 1080, "screen_height": 1920,
     "task_quest": True, "restart_game_on_exit": True,
     "task_auto_hunt_reward": False, "task_attendance": False,
@@ -426,7 +428,7 @@ details summary{cursor:pointer;font-weight:750;margin-bottom:7px}.warning{color:
 <div class="layout-toolbar"><button id="layoutEditButton" class="secondary" type="button" onclick="startLayoutEdit()">화면 배치 편집</button><button id="layoutSaveButton" class="save-layout hidden" type="button" onclick="saveUILayout()">배치 저장</button><button id="layoutCancelButton" class="cancel-layout hidden" type="button" onclick="cancelLayoutEdit()">편집 취소</button><button id="layoutRestoreFeaturesButton" class="restore-features hidden" type="button" onclick="restoreAllFeatures()">숨긴 기능 모두 복원 (0)</button><button id="layoutResetButton" class="secondary" type="button" onclick="resetUILayout()">기본 배치 복원</button><label class="snap-toggle"><input id="layoutSnap" type="checkbox" checked onchange="saveSnapPreference()">자석 맞춤</label><span class="layout-help">X는 화면 배치 편집 중에만 나타나며, 저장하거나 취소하면 사라집니다.</span><button id="memoryCleanup" class="secondary" type="button" onclick="cleanupBluestacksMemory()">메모리 정리</button><button id="quit" class="quit header-quit" type="button" onclick="shutdownApp()">프로그램 종료</button></div>
 <div id="layoutCanvas"><div id="snapGuideX" class="snap-guide vertical"></div><div id="snapGuideY" class="snap-guide horizontal"></div>
 <section id="controlCard" class="card"><div id="statusBox"><div class="status"><span class="dot"></span><span id="status">대기 중</span></div></div>
-<input id="cycles" type="hidden"><input id="infinite" class="hidden" type="checkbox"><span id="start" class="hidden"></span>
+<input id="cycles" type="hidden"><input id="infinite" class="hidden" type="checkbox"><input id="integrated_stall_seconds" type="hidden" value="180"><span id="start" class="hidden"></span>
 <div id="runSetupFeature" class="feature-removable" data-feature-id="run_setup" data-feature-label="자동 점검 설정"><div class="check compact-check"><input id="automatic_check" type="checkbox"><div><b>자동 점검 확인</b><small>체크하면 시작 전 화면과 퀘스트를 확인합니다.</small></div></div></div>
 <div class="inline-dashboard feature-removable" data-feature-id="dashboard" data-feature-label="현황판"><div class="dashboard-title">#현황판</div><div class="summary-grid"><div class="summary-item"><div class="summary-label">실행</div><div id="simpleRun" class="summary-value">대기 중</div></div><button id="dashboardErrors" class="summary-item dashboard-error-link" type="button" onclick="openDashboardErrors()" aria-haspopup="dialog" title="전체 오류 화면 열기"><span class="summary-label">전체 오류</span><span id="simpleErrors" class="summary-value">0건</span></button><div class="summary-item"><div class="summary-label">완료</div><div id="simpleCompleted" class="summary-value">0개</div></div></div></div>
 <p class="warning dashboard-warning">실행·재시작 전 BlueStacks를 팝업 없는 전투 화면으로 돌려놓으세요.</p></section>
@@ -434,6 +436,7 @@ details summary{cursor:pointer;font-weight:750;margin-bottom:7px}.warning{color:
 <div class="task-group"><div class="task-group-name">퀘스트</div><div class="task-grid">
 <label class="task-row"><input id="task_quest" type="checkbox"><span class="task-text"><span class="task-name">현재 퀘스트 자동 완료</span><span class="task-state ready">현재 사용 가능</span></span></label>
 <label class="task-row"><input id="restart_game_on_exit" type="checkbox"><span class="task-text"><span class="task-name">게임 종료 시 자동 재실행</span><span class="task-state ready">Android 바탕화면 감지 시 게임을 열고 퀘스트를 다시 시작</span></span></label>
+<label class="check integrated-automation-control"><input id="integrated_automation" type="checkbox"><div><b>통합 자동 순환</b><small>스테이지 정체 3분 후 일일 던전·아레나·길드·성장 작업을 안전하게 확인합니다.</small></div></label>
 </div><div class="boss-preset-row"><div class="boss-preset-title">보스 소환 프리셋 순서</div><div class="boss-preset-help">사용할 번호를 누른 순서대로 변경합니다. 번호 옆 원은 실제 실행 순서입니다.</div><div class="boss-preset-options">
 <label class="boss-preset-option"><input id="boss_preset_1" type="checkbox" onchange="updateBossPresetOrder(1)"><span>1 [전투력]</span><span id="boss_preset_rank_1" class="boss-preset-rank"></span></label>
 <label class="boss-preset-option"><input id="boss_preset_2" type="checkbox" onchange="updateBossPresetOrder(2)"><span>2 [단일보스]</span><span id="boss_preset_rank_2" class="boss-preset-rank"></span></label>
@@ -495,6 +498,7 @@ details summary{cursor:pointer;font-weight:750;margin-bottom:7px}.warning{color:
 <div><label>보스 소환</label><input id="boss_summon"><span class="field-help">화면 상단 중앙의 빨간 버튼</span></div><div></div>
 </div></div><div class="coordinate-preview-toolbar"><div><b>좌표 옆 작은 화면의 빨간 십자가 실제 클릭 위치입니다.</b></div><button id="coordinatePreviewRefresh" class="secondary" type="button" onclick="refreshCoordinatePreviews()">미리보기 갱신</button></div></div>
 <div class="buttons"><button class="secondary" onclick="saveSettings()">설정 저장</button><button class="secondary" onclick="loadDefaults()">기본값 복원</button></div></details></section>
+<section id="integratedAutomationCard" class="card hidden"><h2>통합 자동 순환 상태</h2><p class="task-help">관리자 전용 · 오늘 확인 시각, 다음 확인, 보류 이유와 실패 횟수입니다.</p><div id="integratedAutomationStatus" class="daily-summary-list"><div class="daily-summary-empty">기록을 불러오는 중입니다.</div></div></section>
 <section id="adminCard" class="card"><div id="adminLogin"><b>관리자 모드</b><div class="admin-row" style="margin-top:12px"><div><label>관리자 비밀번호</label><input id="adminPassword" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')adminLogin()"></div><button class="secondary" type="button" onclick="adminLogin()">관리자 로그인</button></div><aside id="supportCard" class="support-box" aria-labelledby="supportTitle"><b id="supportTitle">☕ 개발자를 응원해 주세요</b><p>후원은 프로그램 개선과 오류 수정에 도움이 됩니다. 후원 확인 후 관리자 모드 비밀번호를 개별 안내해 드립니다.</p><div class="support-payment"><div class="support-bank"><span>카카오뱅크</span><strong id="supportAccount" class="support-account">후원 정보 확인 중</strong><span id="supportHolder" class="support-holder"></span></div><button class="support-copy" type="button" onclick="copySupportAccount()">계좌번호 복사</button></div><p class="support-note">송금 전 예금주를 확인해 주세요. 후원 확인 시 입금자명과 입금 시각을 알려 주세요.</p><p>후원·오류 문의: <a id="supportEmail" style="color:#93c5fd;overflow-wrap:anywhere"></a></p></aside></div><div id="adminLoggedIn" class="hidden"><div style="display:flex;align-items:center;justify-content:space-between;gap:12px"><div><b>관리자 모드</b><div class="admin-ok">관리자로 로그인했습니다.</div></div><button class="secondary" style="flex:0 0 auto" type="button" onclick="adminLogout()">로그아웃</button></div><div class="channel-box"><div id="channelCurrent" class="channel-current">정식 통합 버전 v16.0</div><div class="channel-notice">모든 기능은 하나의 정식 버전으로 제공됩니다.</div></div></div><details class="usage-notice" onpointerenter="if(event.pointerType==='mouse')this.open=true" onpointerleave="if(event.pointerType==='mouse'&&!this.contains(document.activeElement))this.open=false"><summary>무료 사용 및 이용 규정</summary><ul><li>이 프로그램은 무료로 사용할 수 있으며, 후원은 자율입니다. 관리자 모드 비밀번호는 후원 확인 후 별도로 안내됩니다.</li><li>제작자의 사전 허락 없이 프로그램을 재배포하거나 판매·유료 패키지에 포함할 수 없습니다.</li><li>제작자 표시를 삭제하거나 다른 사람의 제작물로 표시할 수 없습니다. 수정본을 배포하려면 사전 허락을 받아 주세요.</li><li>관리자 비밀번호를 무단으로 공유하거나 판매하지 마세요.</li><li>이용하는 게임 및 플랫폼의 이용약관과 운영정책을 확인하고 준수해 주세요.</li><li>프로그램 사용은 사용자의 자유로운 선택입니다. 사용으로 발생할 수 있는 계정 정지·이용 제한, 게임 내 재화 또는 데이터 손실 등 각종 문제와 불이익에 대한 책임은 사용자 본인에게 있습니다.</li></ul></details></section>
 <section id="dailySummaryCard" class="card hidden"><div class="daily-summary-heading"><div><h2 id="dailySummaryTitle">오늘의 총정리</h2><p id="dailySummaryMeta">기록을 불러오는 중입니다.</p></div></div><div class="daily-summary-stats"><div class="daily-summary-stat"><span>실행</span><strong id="dailyRuns">0회</strong></div><div class="daily-summary-stat"><span>완료</span><strong id="dailyCompleted">0개</strong></div><div class="daily-summary-stat"><span>오류</span><strong id="dailyErrors">0건</strong></div><div class="daily-summary-stat"><span>복구</span><strong id="dailyRecoveries">0회</strong></div></div><div class="daily-summary-section"><h3>오늘 선택한 작업</h3><div id="dailySummaryTasks" class="daily-summary-list"><div class="daily-summary-empty">아직 실행한 작업이 없습니다.</div></div></div><div class="daily-summary-section"><h3>아레나 덱 판단</h3><div id="dailySummaryArena" class="daily-summary-list"><div class="daily-summary-empty">오늘의 아레나 판단이 없습니다.</div></div></div><div class="daily-summary-section"><h3>최근 활동</h3><div id="dailySummaryActivities" class="daily-summary-list"><div class="daily-summary-empty">오늘의 활동이 없습니다.</div></div></div><div class="daily-summary-section"><h3>배포 확인 상태</h3><div id="dailySummaryDeploy" class="daily-summary-list"></div></div><div class="daily-summary-actions"><button type="button" onclick="poll(true)">새로고침</button><button class="secondary" type="button" onclick="copyDailySummary()">총정리 복사</button></div></section>
 <section id="adminLogs" class="card hidden"><div style="display:flex;align-items:center;justify-content:space-between;gap:12px"><div><b>실행 로그</b> <span id="executionCount" class="warning">(실행횟수:000)</span></div><button class="secondary" style="flex:0 0 auto;padding:9px 14px" onclick="copyLogs()">로그 복사</button></div><pre id="logs">준비 중…</pre></section>
@@ -518,6 +522,7 @@ setTimeout(checkUIRevision,1000);
 
 const keys=['cycles','infinite','automatic_check','adjust_screen_size','screen_width','screen_height','task_quest','task_auto_hunt_reward','task_attendance','task_missions','task_event_rewards','task_pass_free','task_mailbox','task_crumble_dungeon','task_crumble_dungeon_runs','task_arena','task_arena_decision','arena_decision_mode','arena_kind','task_arena_runs','task_implant_tower','task_implant_tower_runs','task_exp_dungeon','task_exp_dungeon_runs','task_exp_dungeon_continuous','task_coin_dungeon','task_coin_dungeon_runs','task_coin_dungeon_continuous','task_dough_dungeon','task_dough_dungeon_runs','task_dough_dungeon_continuous','task_research_stone_dungeon','task_research_stone_dungeon_runs','task_research_stone_dungeon_continuous','task_rune_crystal_dungeon','task_rune_crystal_dungeon_runs','task_rune_crystal_dungeon_continuous','task_guild_attendance','task_cookie_upgrade','task_pet_upgrade','task_breakthrough','boss_preset_1','boss_preset_2','boss_preset_3','boss_preset_4','boss_preset_5','boss_preset_order','boss_keyboard_move_normal','boss_keyboard_move_corner','draw_timeout','equipment_timeout','monster_timeout','bag_timeout','stage_timeout','boss_move_seconds','boss_corner_move_seconds','quest_panel','ten_draw','bottom_x','auto_button','auto_start','bag_item','item_use','equipment_action','boss_summon'];
 keys.splice(keys.indexOf('task_quest')+1,0,'restart_game_on_exit');
+keys.splice(keys.indexOf('automatic_check')+1,0,'integrated_automation','integrated_stall_seconds');
 const coordinatePreviewFields=[['quest_panel','퀘스트 패널'],['ten_draw','10회 뽑기'],['bottom_x','하단 X'],['auto_button','Auto'],['auto_start','Auto 시작'],['bag_item','가방 첫 아이템'],['item_use','아이템 사용'],['equipment_action','장비 장착/판매'],['boss_summon','보스 소환']];
 let defaults={};
 let lastErrorCount=0;
@@ -670,9 +675,10 @@ async function shutdownApp(){if(!confirm('실행 중인 작업을 정지하고 �
 async function copyLogs(){let text=document.getElementById('logs').textContent;try{await navigator.clipboard.writeText(text);alert('실행 로그를 복사했습니다.')}catch(e){let t=document.createElement('textarea');t.value=text;document.body.appendChild(t);t.select();document.execCommand('copy');t.remove();alert('실행 로그를 복사했습니다.')}}
 async function copyText(text,message){try{await navigator.clipboard.writeText(text);alert(message)}catch(e){let t=document.createElement('textarea');t.value=text;document.body.appendChild(t);t.select();document.execCommand('copy');t.remove();alert(message)}}
 let lastDailySummary=null;
+function renderIntegratedAutomation(summary){let target=document.getElementById('integratedAutomationStatus'),card=document.getElementById('integratedAutomationCard'),host=document.getElementById('dailySummaryCard'),data=summary?.integrated_automation;if(!target||!data)return;if(card&&host&&card.parentElement!==host){card.classList.remove('card','hidden');card.classList.add('daily-summary-section');host.insertBefore(card,host.querySelector('.daily-summary-actions'))}let labels={daily:'일일 던전',crumble:'크럼블 던전',arena:'아레나',implant:'림플란트 타워',guild:'길드',cookie:'쿠키',pet:'펫',breakthrough:'돌파력',fame:'명성'};target.innerHTML=(data.tasks||[]).map(item=>`<div class="daily-summary-row"><span>${esc(labels[item.task]||item.task)} · ${esc(item.status||'대기')}</span><span>최근 ${esc(item.last_checked||'-')} · 다음 ${esc(item.next_check||'-')} · 실패 ${esc(item.failures||0)}회 · ${esc(item.skip_reason||'-')}</span></div>`).join('')||'<div class="daily-summary-empty">아직 확인한 작업이 없습니다.</div>'}
 function summaryPower(value){let number=Number(value);if(!Number.isFinite(number)||number<=0)return '판독 실패';if(number>=1000000)return (number/1000000).toFixed(2).replace(/\.00$/,'')+'M';if(number>=1000)return (number/1000).toFixed(2).replace(/\.00$/,'')+'K';return String(Math.round(number))}
 function renderDailySummary(summary){
-    if(!summary)return;lastDailySummary=summary;
+    if(!summary)return;lastDailySummary=summary;renderIntegratedAutomation(summary);
     document.getElementById('dailySummaryTitle').textContent=(summary.date||'-')+' 오늘의 총정리';
     document.getElementById('dailySummaryMeta').textContent=(summary.version||'-')+' · '+(summary.status||'대기 중');
     document.getElementById('dailyRuns').textContent=String(summary.runs||0)+'회';
@@ -791,6 +797,8 @@ def validate(raw):
     data["cycles"] = max(1, min(int(data["cycles"]), 100))
     data["infinite"] = bool(data["infinite"])
     data["automatic_check"] = bool(data["automatic_check"])
+    data["integrated_automation"] = bool(data.get("integrated_automation", False))
+    data["integrated_stall_seconds"] = 180
     data["adjust_screen_size"] = bool(data["adjust_screen_size"])
     data["restart_game_on_exit"] = bool(data.get("restart_game_on_exit", True))
     data["boss_keyboard_move_normal"] = raw.get("boss_keyboard_move_normal") is True
@@ -848,7 +856,7 @@ def settings():
 
 LAYOUT_CARD_IDS = {
     "controlCard", "summaryCard", "settingsCard", "adminCard",
-    "adminLogs", "adminScreenshots",
+    "adminLogs", "adminScreenshots", "integratedAutomationCard",
 }
 
 
@@ -1385,10 +1393,37 @@ def status_payload(is_admin):
             "execution_count": STATE["execution_count"],
         }
     if is_admin:
+        day = INTEGRATED_AUTOMATION.today()
+        tasks = day.get("tasks", {})
+        integrated = []
+        for name in MAINTENANCE_ORDER:
+            task = tasks.get(name, {}) if isinstance(tasks, dict) else {}
+            failures = int(task.get("failures", 0) or 0) if isinstance(task, dict) else 0
+            if task.get("disabled"):
+                status = "오늘 제외"
+            elif failures:
+                status = "재시도 대기"
+            elif task:
+                status = "확인 완료"
+            else:
+                status = "대기"
+            integrated.append({
+                "task": name,
+                "status": status,
+                "last_checked": task.get("checked_at") or "-",
+                "next_check": task.get("next_check_at") or "-",
+                "skip_reason": task.get("result") or "-",
+                "failures": failures,
+            })
+        payload["integrated_automation"] = {
+            "stall_seconds": 180,
+            "tasks": integrated,
+        }
         summary = DAILY_SUMMARY.today()
         summary.update({
             "version": APP_VERSION,
             "status": payload["status"],
+            "integrated_automation": payload["integrated_automation"],
             "deployment": {
                 "mac": "검증 완료",
                 "windows": "실제 실행 검증 필요",
