@@ -18,6 +18,20 @@ DAILY_EXCEPTIONS = ("daily", "crumble", "arena", "implant")
 ALERT_TASKS = ("guild", "cookie", "pet")
 
 
+def _task_pending(tasks: dict, task: str) -> bool:
+    """A missing or previously failed task may run; a successful task may not."""
+    state = tasks.get(task)
+    if not isinstance(state, dict):
+        return True
+    if bool(state.get("disabled", False)):
+        return False
+    try:
+        failures = int(state.get("failures", 0))
+    except (TypeError, ValueError):
+        failures = 0
+    return 0 < failures < 3
+
+
 class StallTracker:
     """Fire once when one stage quest and progress key stay unchanged."""
 
@@ -61,13 +75,11 @@ def build_candidates(day: dict, alerts: dict[str, bool], completed: set[str]) ->
     for task in DAILY_EXCEPTIONS:
         if task == "implant" and bool(day.get("implant_850_complete", False)):
             continue
-        if task not in tasks:
+        if _task_pending(tasks, task):
             candidates.append(task)
 
     for task in ALERT_TASKS:
-        task_state = tasks.get(task)
-        disabled = isinstance(task_state, dict) and bool(task_state.get("disabled", False))
-        if alerts.get(task, False) and task not in tasks and not disabled:
+        if alerts.get(task, False) and _task_pending(tasks, task):
             candidates.append(task)
 
     if "coin" in completed and "breakthrough" not in tasks and "breakthrough" not in completed:
@@ -76,6 +88,80 @@ def build_candidates(day: dict, alerts: dict[str, bool], completed: set[str]) ->
         candidates.append("fame")
 
     return [task for task in MAINTENANCE_ORDER if task in candidates]
+
+
+def _result_text(value) -> str:
+    if isinstance(value, str):
+        return value
+    try:
+        return json.dumps(value, ensure_ascii=False, sort_keys=True)
+    except (TypeError, ValueError):
+        return str(value)
+
+
+def run_integrated_maintenance(
+    store: "IntegratedAutomationStore",
+    alerts_provider: Callable[[], dict[str, bool]],
+    runners: dict[str, Callable],
+) -> dict:
+    """Run one safe maintenance window and persist each isolated outcome.
+
+    Keys beginning with ``_`` are optional lifecycle callbacks supplied by the
+    host: ``_recover`` returns to battle and ``_is_stop`` identifies a user
+    stop exception. A game relaunch is detected by exception class name so the
+    pure scheduler does not need to import the device automation module.
+    """
+    attempted: list[str] = []
+    completed: list[str] = []
+    failed: dict[str, str] = {}
+    derived: set[str] = set()
+    recover = runners.get("_recover")
+    is_stop = runners.get("_is_stop", lambda _error: False)
+
+    while True:
+        day = store.today()
+        alerts = alerts_provider() or {}
+        candidates = build_candidates(day, alerts, derived)
+        task = next(
+            (
+                name for name in candidates
+                if name not in attempted and callable(runners.get(name))
+            ),
+            None,
+        )
+        if task is None:
+            break
+        attempted.append(task)
+        try:
+            result = runners[task](day)
+            if callable(recover):
+                recover()
+            store.mark_checked(task, _result_text(result))
+            completed.append(task)
+            if task == "daily" and isinstance(result, dict) and "coin" in result:
+                derived.add("coin")
+            if task == "arena":
+                derived.add("arena")
+            if task == "implant" and result == "complete":
+                store.set_implant_850_complete(True)
+        except Exception as error:
+            if is_stop(error):
+                raise
+            if error.__class__.__name__ == "GameRelaunched":
+                if callable(recover):
+                    recover()
+                continue
+            reason = str(error) or error.__class__.__name__
+            store.mark_failure(task, reason)
+            failed[task] = reason
+            if callable(recover):
+                try:
+                    recover()
+                except Exception as recovery_error:
+                    if is_stop(recovery_error):
+                        raise
+
+    return {"attempted": attempted, "completed": completed, "failed": failed}
 
 
 class IntegratedAutomationStore:

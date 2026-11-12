@@ -82,6 +82,17 @@ class CandidateSchedulerTests(unittest.TestCase):
 
         self.assertEqual(candidates, ["arena", "pet", "breakthrough"])
 
+    def test_failed_task_is_retryable_until_three_failures_disable_it(self):
+        for failures in (1, 2):
+            day = {
+                "tasks": {"daily": {"failures": failures, "disabled": False}},
+                "implant_850_complete": False,
+            }
+            self.assertIn("daily", build_candidates(day, {}, completed=set()))
+
+        day["tasks"]["daily"] = {"failures": 3, "disabled": True}
+        self.assertNotIn("daily", build_candidates(day, {}, completed=set()))
+
 
 if __name__ == "__main__":
     unittest.main()

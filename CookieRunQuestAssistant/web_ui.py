@@ -22,6 +22,11 @@ from urllib.parse import parse_qs, urlparse
 import quest_assistant as engine
 import release_update
 from daily_summary import DailySummaryStore
+from integrated_automation import (
+    IntegratedAutomationStore,
+    StallTracker,
+    run_integrated_maintenance,
+)
 from ui_live import LiveHTML
 
 
@@ -85,6 +90,7 @@ SCREENSHOT_TARGET_BYTES = 150 * 1024 * 1024
 LOCK = threading.Lock()
 STATE = {"running": False, "paused": False, "maintenance": False, "pause_requested": False, "can_skip": False, "last_data": None, "status": "대기 중", "logs": [], "errors": [], "execution_count": 0, "worker": None}
 DAILY_SUMMARY = DailySummaryStore(DAILY_SUMMARY_FILE)
+INTEGRATED_AUTOMATION = IntegratedAutomationStore(INTEGRATED_AUTOMATION_FILE)
 
 
 def source_build_id():
@@ -201,6 +207,71 @@ def record_run_start(data):
 
 def configure_daily_summary_callbacks():
     engine.ARENA_DECISION_REPORTER = lambda item: summary_call("record_arena_decision", item)
+
+
+def configure_integrated_automation(data, clock=time.monotonic):
+    """Attach the 3-minute maintenance hook only to integrated infinite quests."""
+    engine.INTEGRATED_MAINTENANCE_REPORTER = None
+    enabled = (
+        bool(data.get("integrated_automation"))
+        and bool(data.get("task_quest"))
+        and bool(data.get("infinite"))
+    )
+    if not enabled:
+        return
+
+    tracker = StallTracker(180)
+
+    def alerts_provider():
+        image = engine.screenshot()
+        return engine.integrated_alerts(image)
+
+    def recover():
+        engine.recover_to_battle(timeout=50)
+
+    runners = {
+        "daily": engine.run_integrated_daily_dungeons,
+        "crumble": engine.run_integrated_crumble,
+        "arena": engine.run_integrated_arena,
+        "implant": engine.run_integrated_implant,
+        "guild": lambda _day: engine.run_guild_maintenance(),
+        "cookie": lambda _day: engine.run_cookie_maintenance(),
+        "pet": lambda _day: engine.run_pet_shelter_collection(),
+        "breakthrough": lambda _day: engine.run_breakthrough_once(),
+        "fame": lambda _day: engine.run_fame_once(),
+        "_recover": recover,
+        "_is_stop": lambda _error: bool(engine.STOP),
+    }
+
+    def report(quest, screen, progress_key):
+        if not tracker.observe(quest, screen, progress_key, clock()):
+            return None
+        engine.check_stop()
+        print("\n---------- 통합 자동화 ----------")
+        print("  같은 스테이지가 3분간 정체되어 안전 작업을 확인합니다.")
+        with LOCK:
+            STATE["status"] = "통합 자동화 확인 중"
+            STATE["can_skip"] = False
+        summary_call("record_activity", "3분 스테이지 정체 · 통합 자동화 확인 시작")
+        try:
+            result = run_integrated_maintenance(
+                INTEGRATED_AUTOMATION, alerts_provider, runners
+            )
+            completed = ", ".join(result["completed"]) or "없음"
+            print(f"  완료 작업: {completed}")
+            if result["failed"]:
+                print(f"  보류 작업: {', '.join(result['failed'])}")
+            summary_call(
+                "record_activity",
+                f"통합 자동화 완료 · {completed}",
+            )
+            return result
+        finally:
+            with LOCK:
+                STATE["status"] = "무한 반복 실행 중"
+            print("---------- 기본 퀘스트 재판별 ----------\n")
+
+    engine.INTEGRATED_MAINTENANCE_REPORTER = report
 
 
 def release_catalog():
@@ -1113,6 +1184,7 @@ def worker(data):
     engine.ERROR_REPORTER = add_error_report
     engine.PROGRESS_REPORTER = update_execution_count
     configure_daily_summary_callbacks()
+    configure_integrated_automation(data)
     try:
         with contextlib.redirect_stdout(writer), contextlib.redirect_stderr(writer):
             print(f"\n실행 코드: {APP_VERSION} · build {BUILD_ID}")
@@ -1271,6 +1343,7 @@ def worker(data):
             safety_report["_no_game_actions"] = bool(data.get("task_arena_decision"))
             add_error_report(safety_report)
     finally:
+        engine.INTEGRATED_MAINTENANCE_REPORTER = None
         with LOCK:
             STATE["running"]=False
             STATE["pause_requested"]=False
