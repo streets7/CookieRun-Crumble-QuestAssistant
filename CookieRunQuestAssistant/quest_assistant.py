@@ -1442,6 +1442,153 @@ def cookie_preset_screen_visible(image: Image.Image) -> bool:
     return upper_teal > 0.45 and lower_teal > 0.55 and preset_row > 0.40
 
 
+def _integrated_red_dot(image: Image.Image, box) -> bool:
+    return pixel_fraction(
+        image, box,
+        lambda r, g, b: r > 185 and r > g * 1.8 and r > b * 1.25 and g < 125,
+    ) > 0.08
+
+
+def integrated_alerts(image: Image.Image) -> dict[str, bool]:
+    """Read only top-level alerts; the dungeon dot is intentionally ignored."""
+    if not _main_battle_visible(image):
+        return {"cookie": False, "pet": False, "guild": False, "dungeon": False}
+    cookie = _integrated_red_dot(image, (90, 1735, 165, 1810))
+    return {
+        # Cookie and pet share one top-level navigation item. Their own tabs
+        # are checked again before an action is allowed.
+        "cookie": cookie,
+        "pet": cookie,
+        "guild": _integrated_red_dot(image, (720, 1735, 800, 1810)),
+        "dungeon": False,
+    }
+
+
+def cookie_maintenance_visible(image: Image.Image) -> bool:
+    return cookie_preset_screen_visible(image)
+
+
+def pet_shelter_visible(image: Image.Image) -> bool:
+    green = pixel_fraction(
+        image, (0, 180, 1080, 1420),
+        lambda r, g, b: g > r * 1.12 and g > b * 1.05 and g > 75,
+    )
+    orange = _orange_button_fraction(image, (300, 1330, 780, 1490))
+    teal = pixel_fraction(
+        image, (0, 1500, 1080, 1760),
+        lambda r, g, b: g > 80 and b > 80 and g > r * 1.2,
+    )
+    return green > 0.32 and orange > 0.28 and teal > 0.48
+
+
+def breakthrough_visible(image: Image.Image) -> bool:
+    teal = pixel_fraction(
+        image, (0, 1200, 1080, 1760),
+        lambda r, g, b: g > 75 and b > 75 and g > r * 1.18,
+    )
+    orange_buttons = sum(
+        _orange_button_fraction(image, box) > 0.28
+        for box in ((70, 1480, 365, 1625), (390, 1480, 685, 1625), (705, 1480, 1000, 1625))
+    )
+    return teal > 0.48 and orange_buttons == 3
+
+
+def fame_visible(image: Image.Image) -> bool:
+    teal = pixel_fraction(
+        image, (0, 1200, 1080, 1760),
+        lambda r, g, b: g > 75 and b > 75 and g > r * 1.18,
+    )
+    level_button = pixel_fraction(
+        image, (760, 1440, 1040, 1600),
+        lambda r, g, b: g > 95 and b > 95 and g > r * 1.25,
+    )
+    return teal > 0.50 and level_button > 0.35 and not breakthrough_visible(image)
+
+
+def guild_home_visible(image: Image.Image) -> bool:
+    dark_teal = pixel_fraction(
+        image, (0, 600, 1080, 1700),
+        lambda r, g, b: b > 45 and g > 55 and r < 50 and g > r * 1.5,
+    )
+    green_labels = pixel_fraction(
+        image, (250, 900, 1030, 1600),
+        lambda r, g, b: g > 105 and g > r * 1.25 and b > r,
+    )
+    return dark_teal > 0.30 and green_labels > 0.10
+
+
+def guild_help_visible(image: Image.Image) -> bool:
+    dark_teal = pixel_fraction(
+        image, (0, 500, 1080, 1700),
+        lambda r, g, b: g > 55 and b > 55 and r < 65 and g > r * 1.4,
+    )
+    help_all = _orange_button_fraction(image, (270, 1500, 810, 1670))
+    return dark_teal > 0.60 and help_all > 0.35
+
+
+def guild_lab_visible(image: Image.Image) -> bool:
+    teal = pixel_fraction(
+        image, (0, 100, 1080, 1710),
+        lambda r, g, b: g > 60 and b > 60 and g > r * 1.35,
+    )
+    donation_green = pixel_fraction(
+        image, (540, 1510, 1020, 1670),
+        lambda r, g, b: g > 105 and g > r * 1.35 and b > r * 0.8,
+    )
+    return teal > 0.50 and donation_green > 0.34
+
+
+def integrated_ad_pass_visible(image: Image.Image) -> bool:
+    if not daily_tab_active(image):
+        return False
+    orange_skip = pixel_fraction(
+        image, (790, 930, 930, 1080),
+        lambda r, g, b: r > 165 and 45 < g < 150 and b < 90 and r > b * 1.8,
+    )
+    return orange_skip > 0.06
+
+
+def allowed_integrated_action(screen: str, action: str, image: Image.Image) -> bool:
+    """Central no-tap-by-default allowlist for integrated maintenance."""
+    if screen == "cookie" and cookie_maintenance_visible(image):
+        boxes = {
+            "batch_upgrade": (210, 1510, 525, 1635),
+            "team_level": (550, 1510, 870, 1635),
+        }
+        box = boxes.get(action)
+        return bool(box) and pixel_fraction(
+            image, box,
+            lambda r, g, b: r < 70 and g > 130 and b > 120 and g > r * 1.8,
+        ) > 0.30
+    if screen == "pet" and action == "collect_all" and pet_shelter_visible(image):
+        return _orange_button_fraction(image, (300, 1330, 780, 1490)) > 0.28
+    if screen == "breakthrough" and breakthrough_visible(image):
+        boxes = {
+            "attack_level": (70, 1480, 365, 1625),
+            "defense_level": (390, 1480, 685, 1625),
+            "health_level": (705, 1480, 1000, 1625),
+        }
+        box = boxes.get(action)
+        return bool(box) and _orange_button_fraction(image, box) > 0.28
+    if screen == "fame" and action == "level" and fame_visible(image):
+        red_cost = pixel_fraction(
+            image, (820, 1510, 1020, 1595),
+            lambda r, g, b: r > 135 and r > g * 1.35 and r > b * 1.25,
+        )
+        return red_cost < 0.01
+    if screen == "guild_help" and action == "help_all" and guild_help_visible(image):
+        return _orange_button_fraction(image, (270, 1500, 810, 1670)) > 0.35
+    if screen == "guild_lab" and guild_lab_visible(image):
+        if action == "research_donation":
+            return False
+        if action == "research_support":
+            return pixel_fraction(
+                image, (65, 1510, 530, 1670),
+                lambda r, g, b: r < 50 and g > 150 and b > 100 and g > r * 2.0,
+            ) > 0.30
+    return False
+
+
 def select_battle_preset(number: int):
     """Open the cookie roster, select one preset, and safely return to battle."""
     if number not in BOSS_PRESET_SEQUENCE:
