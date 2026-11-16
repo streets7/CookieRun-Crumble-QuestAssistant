@@ -27,5 +27,7 @@ assert.equal(context.canHide('card_adminLogs'), false);
 assert.equal(context.canHide('card_settingsCard'), true);
 assert.match(source, /<section id="adminLogs" class="card">/);
 assert.doesNotMatch(script, /getElementById\('adminLogs'\)\.classList\.toggle\('hidden'/);
+assert.match(script, /function renderExecutionLogs\(/);
+assert.match(script, /renderExecutionLogs\(s\.logs\)/);
 
 console.log('Integrated automation UI: five repeats, persistence, admin status and stale poll guard passed.');

@@ -35,12 +35,12 @@ mkdir -p "$BUILD_DIR/work" "$BUILD_DIR/spec" "$OUTPUT_DIR"
   --distpath "$OUTPUT_DIR" \
   app_entry.py
 
-/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 16.2" "$OUTPUT_DIR/$APP_NAME.app/Contents/Info.plist"
-/usr/libexec/PlistBuddy -c "Add :CFBundleVersion string 160100" "$OUTPUT_DIR/$APP_NAME.app/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 16.3" "$OUTPUT_DIR/$APP_NAME.app/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Add :CFBundleVersion string 160300" "$OUTPUT_DIR/$APP_NAME.app/Contents/Info.plist"
 codesign --force --deep --sign - "$OUTPUT_DIR/$APP_NAME.app"
 ditto -c -k --sequesterRsrc --keepParent \
   "$OUTPUT_DIR/$APP_NAME.app" \
-  "$OUTPUT_DIR/CookieRun-Crumble-QuestAssistant-macOS-v16.2.zip"
+  "$OUTPUT_DIR/CookieRun-Crumble-QuestAssistant-macOS-v16.3.zip"
 codesign --verify --deep --strict "$OUTPUT_DIR/$APP_NAME.app"
 CQA_DATA_DIR="$BUILD_DIR/self-test" "$OUTPUT_DIR/$APP_NAME.app/Contents/MacOS/$APP_NAME" --self-test
 STAGE_DIR="$BUILD_DIR/installer"
@@ -50,7 +50,7 @@ ditto "$OUTPUT_DIR/$APP_NAME.app" "$STAGE_DIR/$APP_NAME.app"
 ln -s /Applications "$STAGE_DIR/Applications"
 cp "$SCRIPT_DIR/install-macos.txt" "$STAGE_DIR/설치안내.txt"
 hdiutil create -volname "$APP_NAME" -srcfolder "$STAGE_DIR" \
-  -ov -format UDZO "$OUTPUT_DIR/CookieRun-Crumble-QuestAssistant-macOS-v16.2.dmg"
-hdiutil verify "$OUTPUT_DIR/CookieRun-Crumble-QuestAssistant-macOS-v16.2.dmg"
+  -ov -format UDZO "$OUTPUT_DIR/CookieRun-Crumble-QuestAssistant-macOS-v16.3.dmg"
+hdiutil verify "$OUTPUT_DIR/CookieRun-Crumble-QuestAssistant-macOS-v16.3.dmg"
 (cd "$OUTPUT_DIR" && shasum -a 256 *.dmg *.zip > SHA256.txt)
 echo "Built: $OUTPUT_DIR"

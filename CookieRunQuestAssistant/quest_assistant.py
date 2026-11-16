@@ -3121,7 +3121,6 @@ def verified_stage_waiting():
     boss_visible_frames = 0
     summon_stage = None
     summons_for_stage = 0
-    reported_attempts = 0
     summon_limit_reported = False
     active_battle_preset = None
     next_quest_candidate = None
@@ -3139,8 +3138,6 @@ def verified_stage_waiting():
             f"{stage_number[0]}-{stage_number[1]}" if stage_number else "unknown"
         )
         if state == "battle" and quest_complete(image):
-            if INTEGRATED_MAINTENANCE_REPORTER:
-                INTEGRATED_MAINTENANCE_REPORTER("complete", state, progress_key)
             print("  스테이지 클리어 완료 표시 확인: 숫자 비교 없이 보상을 받습니다.")
             break
         detected_name, detected_confidence = ("unknown", 0.0)
@@ -3173,21 +3170,11 @@ def verified_stage_waiting():
                 if stage_key != summon_stage:
                     summon_stage = stage_key
                     summons_for_stage = 0
-                    reported_attempts = 0
                     summon_limit_reported = False
                     active_battle_preset = None
                     next_quest_candidate, next_quest_frames = None, 0
                 presets = BOSS_PRESET_SEQUENCE
-                attempt_limit = max(
-                    5 if INTEGRATED_MAINTENANCE_REPORTER else 0,
-                    len(presets) or 3,
-                )
-                if summons_for_stage > reported_attempts:
-                    reported_attempts = summons_for_stage
-                    if INTEGRATED_MAINTENANCE_REPORTER:
-                        INTEGRATED_MAINTENANCE_REPORTER(
-                            "stage_attempt", "battle", progress_key
-                        )
+                attempt_limit = len(presets) or 3
                 if summons_for_stage >= attempt_limit:
                     if not summon_limit_reported:
                         stage_label = f"{current_stage[0]}-{current_stage[1]}" if current_stage else "현재 스테이지"
@@ -3237,6 +3224,10 @@ def verified_stage_waiting():
             next_report = now + 60
         time.sleep(quest_completion_poll_interval(started))
     claim_reward_verified("stage")
+    if INTEGRATED_MAINTENANCE_REPORTER:
+        INTEGRATED_MAINTENANCE_REPORTER(
+            "stage_complete", "battle", progress_key
+        )
 
 
 def verified_bag() -> bool:

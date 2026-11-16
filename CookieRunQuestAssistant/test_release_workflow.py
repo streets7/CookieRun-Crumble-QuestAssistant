@@ -21,8 +21,8 @@ class ReleaseWorkflowTests(unittest.TestCase):
 
     def test_release_uploads_exact_v16_1_installer_types(self):
         text = (ROOT / ".github" / "workflows" / "release-desktop.yml").read_text(encoding="utf-8")
-        self.assertIn("CookieRun-Crumble-QuestAssistant-macOS-v16.2.dmg", text)
-        self.assertIn("CookieRun-Crumble-QuestAssistant-Windows11-v16.2-Setup.exe", text)
+        self.assertIn("CookieRun-Crumble-QuestAssistant-macOS-v16.3.dmg", text)
+        self.assertIn("CookieRun-Crumble-QuestAssistant-Windows11-v16.3-Setup.exe", text)
         self.assertIn("node test_integrated_automation_ui.cjs", text)
         self.assertIn("SHA256.txt", text)
 

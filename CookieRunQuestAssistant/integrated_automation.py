@@ -47,7 +47,7 @@ class StallTracker:
         self.triggered = False
 
     def observe(self, quest: str, screen: str, progress_key: str, at: float) -> bool:
-        if screen != "battle" or quest not in ("stage", "stage_attempt"):
+        if screen != "battle" or quest not in ("stage", "stage_complete"):
             self.reset()
             return False
         identity = str(progress_key)
@@ -55,7 +55,7 @@ class StallTracker:
             self.identity = identity
             self.attempts = 0
             self.triggered = False
-        if quest != "stage_attempt":
+        if quest != "stage_complete":
             return False
         if self.triggered:
             return False

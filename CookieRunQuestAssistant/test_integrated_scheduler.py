@@ -4,15 +4,26 @@ from integrated_automation import MAINTENANCE_ORDER, StallTracker, build_candida
 
 
 class StallTrackerTests(unittest.TestCase):
+    def test_same_stage_triggers_on_fifth_completed_stage_run(self):
+        tracker = StallTracker(threshold=5)
+
+        for completion in range(1, 5):
+            self.assertFalse(
+                tracker.observe("stage_complete", "battle", "297-1", completion)
+            )
+        self.assertTrue(
+            tracker.observe("stage_complete", "battle", "297-1", 5)
+        )
+
     def test_same_stage_triggers_on_fifth_actual_attempt(self):
         tracker = StallTracker(threshold=5)
 
         for attempt in range(1, 5):
             self.assertFalse(
-                tracker.observe("stage_attempt", "battle", "297-1", attempt)
+                tracker.observe("stage_complete", "battle", "297-1", attempt)
             )
-        self.assertTrue(tracker.observe("stage_attempt", "battle", "297-1", 5))
-        self.assertFalse(tracker.observe("stage_attempt", "battle", "297-1", 6))
+        self.assertTrue(tracker.observe("stage_complete", "battle", "297-1", 5))
+        self.assertFalse(tracker.observe("stage_complete", "battle", "297-1", 6))
 
     def test_regular_battle_polling_does_not_count_as_attempts(self):
         tracker = StallTracker(threshold=5)
@@ -21,28 +32,28 @@ class StallTrackerTests(unittest.TestCase):
             self.assertFalse(tracker.observe("stage", "battle", "297-1", poll))
         for attempt in range(1, 5):
             self.assertFalse(
-                tracker.observe("stage_attempt", "battle", "297-1", 20 + attempt)
+                tracker.observe("stage_complete", "battle", "297-1", 20 + attempt)
             )
-        self.assertTrue(tracker.observe("stage_attempt", "battle", "297-1", 25))
+        self.assertTrue(tracker.observe("stage_complete", "battle", "297-1", 25))
 
     def test_stage_progress_change_resets_attempt_count(self):
         tracker = StallTracker(threshold=5)
         for attempt in range(4):
-            tracker.observe("stage_attempt", "battle", "297-1", attempt)
+            tracker.observe("stage_complete", "battle", "297-1", attempt)
 
         for attempt in range(4):
             self.assertFalse(
-                tracker.observe("stage_attempt", "battle", "297-2", 10 + attempt)
+                tracker.observe("stage_complete", "battle", "297-2", 10 + attempt)
             )
-        self.assertTrue(tracker.observe("stage_attempt", "battle", "297-2", 14))
+        self.assertTrue(tracker.observe("stage_complete", "battle", "297-2", 14))
 
     def test_non_battle_screen_resets_stall(self):
         tracker = StallTracker(threshold=5)
         for attempt in range(4):
-            tracker.observe("stage_attempt", "battle", "297-1", attempt)
+            tracker.observe("stage_complete", "battle", "297-1", attempt)
         tracker.observe("stage", "reward", "297-1", 10)
 
-        self.assertFalse(tracker.observe("stage_attempt", "battle", "297-1", 11))
+        self.assertFalse(tracker.observe("stage_complete", "battle", "297-1", 11))
 
 
 class CandidateSchedulerTests(unittest.TestCase):

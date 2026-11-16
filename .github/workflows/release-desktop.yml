@@ -15,9 +15,9 @@ jobs:
       matrix:
         include:
           - os: macos-15-intel
-            artifact: macos-v16.2
+            artifact: macos-v16.3
           - os: windows-2022
-            artifact: windows-v16.2
+            artifact: windows-v16.3
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -74,7 +74,7 @@ jobs:
           name: ${{ matrix.artifact }}
           if-no-files-found: error
           path: |
-            배포/macos/CookieRun-Crumble-QuestAssistant-macOS-v16.2.dmg
+            배포/macos/CookieRun-Crumble-QuestAssistant-macOS-v16.3.dmg
             배포/macos/SHA256.txt
       - uses: actions/upload-artifact@v4
         if: runner.os == 'Windows'
@@ -82,7 +82,7 @@ jobs:
           name: ${{ matrix.artifact }}
           if-no-files-found: error
           path: |
-            배포/windows/CookieRun-Crumble-QuestAssistant-Windows11-v16.2-Setup.exe
+            배포/windows/CookieRun-Crumble-QuestAssistant-Windows11-v16.3-Setup.exe
             배포/windows/SHA256.txt
 
   release:
@@ -94,11 +94,11 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: macos-v16.2
+          name: macos-v16.3
           path: release-assets/macos
       - uses: actions/download-artifact@v4
         with:
-          name: windows-v16.2
+          name: windows-v16.3
           path: release-assets/windows
       - name: Name platform checksums
         run: |
@@ -109,7 +109,7 @@ jobs:
           generate_release_notes: true
           prerelease: false
           files: |
-            release-assets/macos/CookieRun-Crumble-QuestAssistant-macOS-v16.2.dmg
-            release-assets/windows/CookieRun-Crumble-QuestAssistant-Windows11-v16.2-Setup.exe
+            release-assets/macos/CookieRun-Crumble-QuestAssistant-macOS-v16.3.dmg
+            release-assets/windows/CookieRun-Crumble-QuestAssistant-Windows11-v16.3-Setup.exe
             release-assets/SHA256-macOS.txt
             release-assets/SHA256-Windows.txt

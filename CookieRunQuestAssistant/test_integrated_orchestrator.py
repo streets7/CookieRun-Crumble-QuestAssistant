@@ -32,8 +32,8 @@ class IntegratedOrchestratorTests(unittest.TestCase):
     def test_fifth_stage_attempt_then_runs_candidates_in_fixed_order(self):
         tracker = StallTracker(5)
         for attempt in range(4):
-            self.assertFalse(tracker.observe("stage_attempt", "battle", "250-30", attempt))
-        self.assertTrue(tracker.observe("stage_attempt", "battle", "250-30", 4))
+            self.assertFalse(tracker.observe("stage_complete", "battle", "250-30", attempt))
+        self.assertTrue(tracker.observe("stage_complete", "battle", "250-30", 4))
         calls = []
         runners = {
             name: lambda _day, name=name: calls.append(name) or name
@@ -204,7 +204,7 @@ class WebIntegrationTests(unittest.TestCase):
                 {"task_quest": True, "infinite": True, "integrated_automation": True},
             )
             for _ in range(5):
-                engine.INTEGRATED_MAINTENANCE_REPORTER("stage_attempt", "battle", "250-30")
+                engine.INTEGRATED_MAINTENANCE_REPORTER("stage_complete", "battle", "250-30")
 
         run.assert_called_once()
         self.assertEqual(web_ui.STATE["status"], "무한 반복 실행 중")
@@ -220,25 +220,28 @@ class WebIntegrationTests(unittest.TestCase):
                 {"task_quest": True, "infinite": True, "integrated_automation": True},
             )
             for _ in range(10):
-                engine.INTEGRATED_MAINTENANCE_REPORTER("stage_attempt", "battle", "250-30")
+                engine.INTEGRATED_MAINTENANCE_REPORTER("stage_complete", "battle", "250-30")
 
         self.assertEqual(run.call_count, 2)
 
-    def test_completed_stage_resets_hook_without_launching_maintenance(self):
+    def test_completed_stage_reports_after_reward_claim(self):
         import quest_assistant as engine
 
         reporter = mock.Mock()
         image = object()
+        calls = []
         with mock.patch.object(engine, "STOP", False), \
                 mock.patch.object(engine, "INTEGRATED_MAINTENANCE_REPORTER", reporter), \
                 mock.patch.object(engine, "screenshot", return_value=image), \
                 mock.patch.object(engine, "screen_state", return_value="battle"), \
                 mock.patch.object(engine, "quest_complete", return_value=True), \
                 mock.patch.object(engine, "current_stage_number", return_value=(250, 30)), \
-                mock.patch.object(engine, "claim_reward_verified"):
+                mock.patch.object(engine, "claim_reward_verified", side_effect=lambda _quest: calls.append("claim")):
+            reporter.side_effect = lambda *args: calls.append(args[0])
             engine.verified_stage_waiting()
 
-        reporter.assert_called_once_with("complete", "battle", "250-30")
+        reporter.assert_called_once_with("stage_complete", "battle", "250-30")
+        self.assertEqual(calls, ["claim", "stage_complete"])
 
 
 if __name__ == "__main__":

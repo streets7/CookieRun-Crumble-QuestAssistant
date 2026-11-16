@@ -5,7 +5,7 @@
   #error OutputDir must be supplied by build_windows.bat
 #endif
 #ifndef Version
-  #define Version "16.2"
+  #define Version "16.3"
 #endif
 
 [Setup]
@@ -17,7 +17,7 @@ DefaultDirName={localappdata}\Programs\CookieRun Crumble Quest Assistant
 DefaultGroupName=CookieRun Crumble Quest Assistant
 DisableProgramGroupPage=yes
 OutputDir={#OutputDir}
-OutputBaseFilename=CookieRun-Crumble-QuestAssistant-Windows11-v16.2-Setup
+OutputBaseFilename=CookieRun-Crumble-QuestAssistant-Windows11-v16.3-Setup
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
