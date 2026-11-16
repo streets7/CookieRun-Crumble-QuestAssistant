@@ -5,10 +5,12 @@ on:
 
 jobs:
   desktop:
+    env:
+      PYTHONUTF8: '1'
     strategy:
       matrix:
         include:
-          - os: macos-14
+          - os: macos-15-intel
             artifact: CookieRun-Crumble-QuestAssistant-macOS
           - os: windows-2022
             artifact: CookieRun-Crumble-QuestAssistant-Windows11

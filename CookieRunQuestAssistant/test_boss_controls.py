@@ -46,6 +46,7 @@ class BossControlTests(unittest.TestCase):
         self.assertEqual(data['boss_preset_order'], '')
         self.assertEqual(engine.BOSS_PRESET_SEQUENCE, ())
 
+    @unittest.skipUnless(engine.IS_MACOS, "macOS System Events implementation")
     def test_disabled_or_unsupported_keys_do_not_launch_any_process(self):
         self.configure(d=True)
         with patch.object(engine.subprocess, 'run') as run, patch.object(engine.subprocess, 'Popen') as launch:
@@ -54,6 +55,7 @@ class BossControlTests(unittest.TestCase):
             run.assert_not_called()
             launch.assert_not_called()
 
+    @unittest.skipUnless(engine.IS_MACOS, "macOS System Events implementation")
     def test_uncheck_during_focus_never_sends_keydown(self):
         self.configure(d=True)
         with patch.object(engine.subprocess, 'run') as run, \
@@ -85,17 +87,21 @@ class BossControlTests(unittest.TestCase):
                 self.assertNotIn('key down "a"', script)
                 self.assertIn('frontmost', script)
 
+    @unittest.skipUnless(engine.IS_MACOS, "macOS System Events implementation")
     def test_uncheck_releases_held_keys(self):
         self.hold_with_change(lambda: self.configure())
 
+    @unittest.skipUnless(engine.IS_MACOS, "macOS System Events implementation")
     def test_stop_releases_held_keys(self):
         with self.assertRaisesRegex(engine.SafeStop, '긴급정지'):
             self.hold_with_change(lambda: setattr(engine, 'STOP', True))
 
+    @unittest.skipUnless(engine.IS_MACOS, "macOS System Events implementation")
     def test_next_action_releases_held_keys(self):
         with self.assertRaises(engine.SkipAction):
             self.hold_with_change(lambda: setattr(engine, 'SKIP_ACTION', True))
 
+    @unittest.skipUnless(engine.IS_MACOS, "macOS System Events implementation")
     def test_input_failure_still_releases_keys(self):
         self.configure(corner=True)
         process = Mock(returncode=1)

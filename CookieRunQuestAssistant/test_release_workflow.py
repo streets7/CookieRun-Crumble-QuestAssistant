@@ -12,7 +12,7 @@ class ReleaseWorkflowTests(unittest.TestCase):
         text = workflow.read_text(encoding="utf-8")
         self.assertIn("tags:", text)
         self.assertIn("- 'v*'", text)
-        self.assertIn("macos-14", text)
+        self.assertIn("macos-15-intel", text)
         self.assertIn("windows-2022", text)
         self.assertIn("needs: build", text)
         self.assertIn("softprops/action-gh-release@v2", text)
